@@ -171,6 +171,12 @@ def check_frames(video, shots, work="work"):
     try:
         out = gem.ask(CHECK_RULES, images=[sheet])
         probs = out.get("problems", [])
+    except gem.FatalModelError:
+        # Unlike a one-off glitch (still worth a silent best-effort skip -
+        # the video is otherwise finished), an unrecoverable class means the
+        # caller should say why the check didn't happen rather than looking
+        # like it ran clean.
+        raise
     except Exception:
         return sheet, []
     named = []

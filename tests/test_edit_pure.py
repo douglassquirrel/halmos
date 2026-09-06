@@ -1,6 +1,6 @@
 import pytest
 
-from lib import edit
+from lib import edit, gem
 
 pytestmark = pytest.mark.tier1
 
@@ -106,3 +106,34 @@ def test_chunks_extends_past_a_function_word_at_the_boundary():
     # the split is pushed to the next word instead of cutting right after it.
     text = "one two three four five and six"
     assert edit._chunks(text) == ["one two three four five and six"]
+
+
+# ------------------------------------------------------------ check_frames ---
+# TODO.md item 2: check_frames() used to swallow every exception from
+# gem.ask() the same way, silently returning as if nothing needed checking -
+# indistinguishable from "checked, found nothing wrong." A FatalModelError
+# (bad key, billing, exhausted quota, retired model) is worth surfacing to
+# the caller instead, since every remaining check would fail identically;
+# a one-off glitch still degrades silently, since the video is otherwise
+# finished and there's nothing actionable to do about a transient failure.
+def _fake_shots():
+    return [{"beat": "1", "dur": 3.0}, {"beat": "2", "dur": 4.0}]
+
+
+def test_check_frames_lets_a_fatal_model_error_propagate(monkeypatch, tmp_path):
+    monkeypatch.setattr(edit, "run", lambda *a, **k: None)
+    monkeypatch.setattr(
+        edit.gem,
+        "ask",
+        lambda *a, **k: (_ for _ in ()).throw(gem.FatalModelError("quota exhausted")),
+    )
+    with pytest.raises(gem.FatalModelError, match="quota exhausted"):
+        edit.check_frames(str(tmp_path / "final.mp4"), _fake_shots(), work=str(tmp_path))
+
+
+def test_check_frames_still_degrades_silently_on_other_errors(monkeypatch, tmp_path):
+    monkeypatch.setattr(edit, "run", lambda *a, **k: None)
+    monkeypatch.setattr(edit.gem, "ask", lambda *a, **k: (_ for _ in ()).throw(ValueError("boom")))
+    sheet, probs = edit.check_frames(str(tmp_path / "final.mp4"), _fake_shots(), work=str(tmp_path))
+    assert probs == []
+    assert sheet == f"{tmp_path}/_check.png"

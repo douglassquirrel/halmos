@@ -39,7 +39,7 @@ check/format both run clean.
   instructions themselves (`brew install ffmpeg` lacks the caption-rendering
   library — see `README.md`).
 
-## 2. Handle errors from Gemini, and everything else, gracefully — partially done
+## 2. Handle errors from Gemini, and everything else, gracefully — mostly done
 
 What's done, grounded in real error shapes captured against the live API
 (`google.genai.errors.APIError` exposes structured `.code`/`.status`
@@ -61,9 +61,41 @@ attributes, not just a message string):
   applied to everything including errors retrying can't fix.
 - **Model deprecation** now says which constant in `lib/media.py` (or
   `lib/gem.py`) to change, instead of a bare 404.
-- **Say what it was doing** — done for clip generation specifically (the
-  scenario this item's own description uses as the example): the beat, how
-  many clips are already made, and money spent so far.
+- **Say what it was doing, everywhere a model gets called in a loop.**
+  Originally done for clip generation only; now also covers the three gaps
+  this item used to name explicitly:
+  - `1_plan.py`'s still-drawing loop (`media.make_still()`, which calls
+    `gem.client()` directly, not through `gem.ask()`) previously had no
+    error handling at all — an exception mid-run crashed with a raw
+    traceback. Now classifies via `gem.classify_error()` and stops with the
+    beat, how many pictures are already drawn, and spend so far, the same
+    shape as the clip loop's message.
+  - `1_plan.py`'s review loop (`plan.review_still()`) previously caught
+    every exception the same bare way and silently moved to the next beat -
+    indistinguishable from "reviewed, nothing wrong" even when the cause was
+    an invalid key that would fail identically for every remaining beat.
+    Now stops with beat/progress/spend context on the specific classes
+    retrying can't fix; a one-off glitch still degrades to "skip this beat's
+    review" as before.
+  - `2_make.py`'s `edit.choose_inpoint()` loop previously caught every
+    exception the same way and fell back to a centred crop - correct for a
+    one-off glitch, silently wrong for a whole video's worth of shots in a
+    row if the actual cause was e.g. an exhausted quota. Now stops the same
+    way as the clip loop; falls back to centring only for the errors that
+    can't be classified as unrecoverable.
+  - `edit.check_frames()`'s single call at the very end now lets the same
+    unrecoverable classes propagate (reported by `2_make.py` as "could not
+    check the finished frames," not silently treated as "checked, found
+    nothing wrong") rather than swallowing everything indiscriminately.
+
+  Enabled by a new `gem.FatalModelError(RuntimeError)`, raised by `gem.ask()`
+  for the four unrecoverable classes so a caller looping over several items
+  can catch it specifically, distinct from the plain `RuntimeError` raised
+  when retries are simply exhausted (which stays a per-item, not
+  whole-loop, signal). Functions that call `gem.client()` directly instead
+  of going through `gem.ask()` (`media.make_still`, `media.make_clip_veo`/
+  `make_clip_omni`) still classify the raw exception themselves via
+  `gem.classify_error()`, as the clip loop already did.
 
 What's still not done:
 
@@ -79,10 +111,6 @@ What's still not done:
   improved. A full disk isn't handled specially anywhere — it would surface
   as a raw `OSError`, which is at least self-explanatory ("No space left on
   device") even unhandled.
-- **"Say what it was doing" beyond clip generation** — `choose_inpoint()`,
-  `check_frames()`, and the still-generation/review loop in `1_plan.py`
-  already degrade gracefully (best-effort fallbacks, not crashes) but don't
-  yet report beat/spend context the way the clip loop now does.
 
 ## 3. Never make the user edit the folder — done
 

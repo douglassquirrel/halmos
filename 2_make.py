@@ -254,10 +254,17 @@ def main(argv=None):  # noqa: C901 - a linear script's main(), not a candidate f
 
     # ---- 5. the edit --------------------------------------------------------
     gem.say("Choosing the best few seconds of each clip...")
-    for sh in shots:
+    for i, sh in enumerate(shots):
         f = str(clip_path(sh["beat"]))
         try:
             ip, rev, why = edit.choose_inpoint(f, sh["text"], sh["dur"], work=str(work_dir))
+        except gem.FatalModelError as e:
+            # Every remaining shot would fail the same way - stop now rather
+            # than centring every one of the rest identically.
+            sys.exit(
+                f"\nStopped at beat {sh['beat']} ({i}/{len(shots)} in-points already chosen, "
+                f"${gem.spent_so_far():.2f} spent so far).\n\n{e}\n"
+            )
         except Exception as e:  # noqa: BLE001
             clip = float(media.probe(f) or 8.0)
             ip, rev, why = (
@@ -294,7 +301,14 @@ def main(argv=None):  # noqa: C901 - a linear script's main(), not a candidate f
     lufs = edit.loudness(final)
     ok_loud = lufs is not None and -16 <= lufs <= -12
     gem.say(f"Loudness: {lufs:.1f} LUFS" if lufs else "Loudness: could not measure")
-    sheet, probs = edit.check_frames(final, shots, work=str(work_dir))
+    try:
+        sheet, probs = edit.check_frames(final, shots, work=str(work_dir))
+    except gem.FatalModelError as e:
+        sheet, probs = None, []
+        print(
+            f"!! Could not check the finished frames for defects "
+            f"(${gem.spent_so_far():.2f} spent so far): {e}"
+        )
 
     print()
     gem.say(f"FINISHED:  {final}   ({total:.0f} seconds)")

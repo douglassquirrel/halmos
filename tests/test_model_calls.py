@@ -70,6 +70,40 @@ def test_ask_does_not_retry_an_unrecoverable_error(monkeypatch, isolated_home):
     assert calls == []  # never slept - failed on the very first attempt
 
 
+def test_ask_raises_fatal_model_error_specifically_for_an_unrecoverable_class(
+    monkeypatch, isolated_home
+):
+    # A caller looping over several items (choose_inpoint per shot,
+    # review_still per beat) needs to tell "every remaining call will fail
+    # identically, stop now" apart from "this one call didn't pan out" - the
+    # plain RuntimeError raised when retries are simply exhausted (tested
+    # above and below) doesn't carry that distinction, so it must be a
+    # dedicated subclass a caller can catch on its own.
+    class FakeAPIError(Exception):
+        def __init__(self, message, code, status):
+            super().__init__(message)
+            self.code, self.status = code, status
+
+    quota_response = FakeAPIError("Quota exceeded for quota metric", 429, "RESOURCE_EXHAUSTED")
+    monkeypatch.setattr(gem, "client", lambda: FakeClient([quota_response]))
+    with pytest.raises(gem.FatalModelError, match="allowance"):
+        gem.ask("some prompt", retries=3)
+
+
+def test_ask_does_not_raise_fatal_model_error_when_retries_are_simply_exhausted(
+    monkeypatch, isolated_home
+):
+    # The opposite direction of the test above: a malformed response that
+    # keeps failing after real retries is not one of the four unrecoverable
+    # classes (classify_error would call it "unknown"), so it must stay a
+    # plain RuntimeError, not the "stop the whole loop" FatalModelError.
+    monkeypatch.setattr(gem, "client", lambda: FakeClient(FakeTextResponse("not json at all")))
+    monkeypatch.setattr(gem.time, "sleep", lambda s: None)
+    with pytest.raises(RuntimeError) as exc_info:
+        gem.ask("some prompt", retries=3)
+    assert not isinstance(exc_info.value, gem.FatalModelError)
+
+
 # -------------------------------------------------------- media.make_still() -
 def test_make_still_saves_the_returned_image(monkeypatch, isolated_home, tmp_path):
     monkeypatch.setattr(gem, "client", lambda: FakeClient(FakeImageResponse(b"fake-png-bytes")))

@@ -130,6 +130,99 @@ def test_plan_exits_on_missing_style_even_with_a_valid_out_dir(plan_cli, tmp_pat
         plan_cli.main(["--out", str(tmp_path)])
 
 
+class _FakeAPIError(Exception):
+    """See tests/test_gem_errors.py - stands in for google.genai.errors.APIError."""
+
+    def __init__(self, message, code, status):
+        super().__init__(message)
+        self.code, self.status = code, status
+
+
+def _plan_project(tmp_path, n_words=45):
+    words = [f"word{i}" for i in range(n_words)]
+    script_text = " ".join(words)
+    project_dir = tmp_path / "myproject"
+    project_dir.mkdir()
+    (project_dir / "script.txt").write_text(script_text)
+    (project_dir / "style_block.txt").write_text(
+        "Flat vector illustration, warm colours, no photographic hands, no text."
+    )
+    return project_dir, script_text
+
+
+@requires_ffmpeg
+@requires_google_genai
+def test_plan_stops_immediately_on_an_unrecoverable_still_error(plan_cli, tmp_path, monkeypatch):
+    # TODO.md item 2's "fail once, not eleven times" extended to stills:
+    # media.make_still() calls gem.client() directly (no gem.ask() retry
+    # wrapper around it), so 1_plan.py's own loop - previously with no error
+    # handling at all here, a bare exception would have crashed with a raw
+    # traceback - is what has to classify the error and stop, matching what
+    # 2_make.py's clip loop already does.
+    project_dir, script_text = _plan_project(tmp_path)
+    beats_response = FakeTextResponse(json.dumps({"beats": [{"beat": "1", "text": script_text}]}))
+    prompts_response = FakeTextResponse(
+        json.dumps({"prompts": [{"beat": "1", "prompt": "a blue square"}]})
+    )
+    bad_key = _FakeAPIError("API key not valid", 400, "INVALID_ARGUMENT")
+    # One FakeClient instance shared across every gem.client() call in this
+    # run - see _run_plan_then_prepare_make below for why a lambda
+    # constructing a fresh one per call would silently hand every call the
+    # same first queued response instead of advancing through the queue.
+    client = FakeClient([beats_response, prompts_response, bad_key])
+    monkeypatch.setattr(gem, "client", lambda: client)
+
+    with pytest.raises(SystemExit, match="Stopped at beat 1"):
+        plan_cli.main(["--out", str(project_dir)])
+
+
+@requires_ffmpeg
+@requires_google_genai
+def test_plan_stops_immediately_on_an_unrecoverable_review_error(plan_cli, tmp_path, monkeypatch):
+    # Same fail-fast requirement for the still-review loop: plan.review_still
+    # goes through gem.ask(), so an unrecoverable class comes back as a
+    # gem.FatalModelError rather than a raw APIError - previously caught by
+    # a bare "except Exception: continue" that would have silently skipped
+    # every remaining beat's review one by one with zero indication anything
+    # was wrong.
+    import subprocess
+
+    project_dir, script_text = _plan_project(tmp_path)
+    jpeg_path = tmp_path / "still.jpg"
+    subprocess.run(
+        [
+            "ffmpeg",
+            "-v",
+            "error",
+            "-y",
+            "-f",
+            "lavfi",
+            "-i",
+            "color=c=blue:s=64x64",
+            "-frames:v",
+            "1",
+            "-f",
+            "image2",
+            "-vcodec",
+            "mjpeg",
+            str(jpeg_path),
+        ],
+        check=True,
+        capture_output=True,
+    )
+    beats_response = FakeTextResponse(json.dumps({"beats": [{"beat": "1", "text": script_text}]}))
+    prompts_response = FakeTextResponse(
+        json.dumps({"prompts": [{"beat": "1", "prompt": "a blue square"}]})
+    )
+    image_response = FakeImageResponse(jpeg_path.read_bytes(), mime_type="image/jpeg")
+    quota_error = _FakeAPIError("Quota exceeded for quota metric", 429, "RESOURCE_EXHAUSTED")
+    client = FakeClient([beats_response, prompts_response, image_response, quota_error])
+    monkeypatch.setattr(gem, "client", lambda: client)
+
+    with pytest.raises(SystemExit, match="Stopped reviewing at beat 1"):
+        plan_cli.main(["--out", str(project_dir)])
+
+
 # ----------------------------------------------------------- 2_make.py CLI ---
 def _write_plan(project, style_source=None):
     plan_data = {
@@ -376,4 +469,36 @@ def test_make_stops_once_every_clip_model_is_quota_exhausted(
     monkeypatch.setattr(media, "make_clip_omni", quota_exhausted)
 
     with pytest.raises(SystemExit, match="every model in clip_models"):
+        make_cli.main(["--project", str(project_dir)])
+
+
+@requires_ffmpeg
+@requires_drawtext
+@requires_google_genai
+def test_make_stops_immediately_on_an_unrecoverable_inpoint_error(
+    plan_cli, make_cli, tmp_path, monkeypatch
+):
+    # TODO.md item 2's "say what it was doing" extended past clip generation:
+    # choose_inpoint() calls gem.ask() once per shot, so a FatalModelError
+    # here should stop the whole loop with beat/spend context, the same way
+    # an unrecoverable clip error already does - not silently fall back to a
+    # centred crop for every remaining shot in a row.
+    from lib import edit
+
+    project_dir = _run_plan_then_prepare_make(plan_cli, tmp_path, monkeypatch)
+
+    # Clip generation and music aren't what this test is about - skip both by
+    # pre-creating their outputs, the same "already done, don't redo it"
+    # check main() itself uses everywhere else.
+    gen_dir = project_dir / "gen"
+    gen_dir.mkdir()
+    (gen_dir / "beat_1.mp4").write_bytes(b"not a real clip - existence is all that's checked")
+    (project_dir / "audio" / "music_bed.mp3").write_bytes(b"not real music")
+
+    def boom(*a, **k):
+        raise gem.FatalModelError("Today's allowance for this model is used up.")
+
+    monkeypatch.setattr(edit, "choose_inpoint", boom)
+
+    with pytest.raises(SystemExit, match="Stopped at beat 1"):
         make_cli.main(["--project", str(project_dir)])

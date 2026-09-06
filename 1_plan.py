@@ -97,22 +97,39 @@ def main(argv=None):  # noqa: C901 - a linear script's main(), not a candidate f
     gem.say(f"Drawing {len(beats)} pictures (about ${est:.2f})...")
     frames_dir = project_dir / "frames"
     os.makedirs(frames_dir, exist_ok=True)
-    for b in beats:
-        p = media.make_still(b["beat"], prompts[b["beat"]], style, outdir=str(frames_dir))
-        gem.say(f"  {b['beat']}" + ("" if p else "  FAILED - will retry once"))
-        if not p:
-            media.make_still(
-                b["beat"], prompts[b["beat"]], style, outdir=str(frames_dir), force=True
-            )
+    for i, b in enumerate(beats):
+        try:
+            p = media.make_still(b["beat"], prompts[b["beat"]], style, outdir=str(frames_dir))
+            gem.say(f"  {b['beat']}" + ("" if p else "  FAILED - will retry once"))
+            if not p:
+                media.make_still(
+                    b["beat"], prompts[b["beat"]], style, outdir=str(frames_dir), force=True
+                )
+        except Exception as e:  # noqa: BLE001
+            if gem.classify_error(e) in ("bad_key", "billing", "quota", "model_not_found"):
+                # Every remaining picture would fail the same way - stop now
+                # rather than working through the rest identically.
+                sys.exit(
+                    f"\nStopped at beat {b['beat']} ({i}/{len(beats)} pictures already drawn, "
+                    f"${gem.spent_so_far():.2f} spent so far).\n\n{gem.explain_error(e)}\n"
+                )
+            gem.say(f"  {b['beat']}  FAILED ({str(e)[:60]})")
 
     gem.say("Checking each picture against its sentence...")
     fixed = 0
-    for b in beats:
+    for i, b in enumerate(beats):
         img = frames_dir / f"{b['beat']}.png"
         if not img.exists():
             continue
         try:
             v = plan.review_still(str(img), b["text"], prompts[b["beat"]], style)
+        except gem.FatalModelError as e:
+            # Every remaining review would fail the same way - stop now
+            # rather than silently skipping the rest one by one.
+            sys.exit(
+                f"\nStopped reviewing at beat {b['beat']} ({i}/{len(beats)} beats checked, "
+                f"${gem.spent_so_far():.2f} spent so far).\n\n{e}\n"
+            )
         except Exception:
             continue
         if not v.get("ok") and v.get("revised_prompt"):

@@ -183,6 +183,15 @@ def check_budget(about_to_spend, s=None):
 
 
 # ------------------------------------------------------------ error classes --
+class FatalModelError(RuntimeError):
+    """Raised by ask() for an error class retrying can't fix (bad_key,
+    billing, quota, model_not_found). Distinct from the plain RuntimeError
+    ask() raises when retries are simply exhausted, so a caller looping over
+    several items (choose_inpoint per shot, review_still per beat) can tell
+    "stop now, every remaining call will fail identically" apart from "this
+    one call didn't work out" and react differently to each."""
+
+
 # Real shapes captured 2026-09-06 against the live API (see DIARY.md):
 # google.genai.errors.APIError exposes structured .code (int) and .status
 # (str) attributes, not just a message string -
@@ -314,7 +323,7 @@ def ask(prompt, images=None, want_json=True, retries=3):  # noqa: C901
             if kind in ("bad_key", "billing", "quota", "model_not_found"):
                 # Retrying can't fix any of these - failing every one of the
                 # next eleven calls the same way helps nobody.
-                raise RuntimeError(explain_error(e)) from e
+                raise FatalModelError(explain_error(e)) from e
             last = e
             if attempt < retries - 1:
                 time.sleep(backoff_delay(attempt))
