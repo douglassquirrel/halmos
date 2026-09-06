@@ -223,6 +223,70 @@ def test_plan_stops_immediately_on_an_unrecoverable_review_error(plan_cli, tmp_p
         plan_cli.main(["--out", str(project_dir)])
 
 
+@requires_ffmpeg
+@requires_google_genai
+def test_plan_paces_review_calls_between_beats(plan_cli, tmp_path, monkeypatch):
+    # Same pacing requirement as 2_make.py's choose_inpoint loop (see
+    # test_make_paces_choose_inpoint_calls_between_shots) for
+    # plan.review_still(): one gem.ask() call per beat, so needs a pause
+    # between beats to avoid tripping the ~2/minute rate limit near the end
+    # of a long review pass.
+    import subprocess
+
+    words = [f"word{i}" for i in range(45)]
+    beat_texts = [" ".join(words[0:15]), " ".join(words[15:30]), " ".join(words[30:45])]
+    script_text = " ".join(words)
+    project_dir, _ = _plan_project(tmp_path)
+    project_dir.joinpath("script.txt").write_text(script_text)
+
+    jpeg_path = tmp_path / "still.jpg"
+    subprocess.run(
+        [
+            "ffmpeg",
+            "-v",
+            "error",
+            "-y",
+            "-f",
+            "lavfi",
+            "-i",
+            "color=c=blue:s=64x64",
+            "-frames:v",
+            "1",
+            "-f",
+            "image2",
+            "-vcodec",
+            "mjpeg",
+            str(jpeg_path),
+        ],
+        check=True,
+        capture_output=True,
+    )
+    jpeg_bytes = jpeg_path.read_bytes()
+
+    beats_response = FakeTextResponse(
+        json.dumps({"beats": [{"beat": str(i + 1), "text": t} for i, t in enumerate(beat_texts)]})
+    )
+    prompts_response = FakeTextResponse(
+        json.dumps({"prompts": [{"beat": str(i + 1), "prompt": "a blue square"} for i in range(3)]})
+    )
+    image_response = FakeImageResponse(jpeg_bytes, mime_type="image/jpeg")
+    review_response = FakeTextResponse(
+        json.dumps({"ok": True, "problems": [], "revised_prompt": ""})
+    )
+    # 1_plan.py draws every beat's still in one loop, THEN reviews every
+    # beat's still in a separate loop afterward - not interleaved.
+    client = FakeClient(
+        [beats_response, prompts_response] + [image_response] * 3 + [review_response] * 3
+    )
+    monkeypatch.setattr(gem, "client", lambda: client)
+
+    sleeps = []
+    monkeypatch.setattr(plan_cli.time, "sleep", lambda s: sleeps.append(s))
+    plan_cli.main(["--out", str(project_dir)])
+
+    assert sleeps == [gem.TEXT_MODEL_PACING_SECONDS] * 2  # 3 beats, paced between each pair
+
+
 # ----------------------------------------------------------- 2_make.py CLI ---
 def _write_plan(project, style_source=None):
     plan_data = {
@@ -285,12 +349,18 @@ def test_make_exits_when_no_recording_is_found(make_cli, tmp_path):
 
 
 # ------------------------------------------ end-to-end project-dir plumbing --
-def _run_plan_then_prepare_make(plan_cli, tmp_path, monkeypatch):
+def _run_plan_then_prepare_make(plan_cli, tmp_path, monkeypatch, n_beats=1):
     """Runs 1_plan.py for real (only gem.client() faked) into a project
     folder that is not the current directory, then sets gem.client up for
     2_make.py's transcription call too - stopping just short of calling
     2_make.py's main(), so callers can each drive the clip-generation loop
-    differently. Returns project_dir. Shared by several tests below."""
+    differently. Returns project_dir. Shared by several tests below.
+
+    n_beats splits the 45-word script evenly across that many beats (default
+    1, matching every caller before pacing-between-calls needed more than
+    one beat to observe) - each beat needs its own make_still/review_still
+    response queued, so callers wanting more beats just get a longer queue,
+    everything else about the setup is identical."""
     import subprocess
 
     # 45 short, distinct, tightly-timed "words" - long enough to clear
@@ -329,26 +399,45 @@ def _run_plan_then_prepare_make(plan_cli, tmp_path, monkeypatch):
     )
     jpeg_bytes = jpeg_path.read_bytes()
 
-    beats_response = FakeTextResponse(json.dumps({"beats": [{"beat": "1", "text": script_text}]}))
+    chunk = len(words) // n_beats
+    beat_names = [str(i + 1) for i in range(n_beats)]
+    beat_texts = []
+    for i in range(n_beats):
+        start, end = i * chunk, (i + 1) * chunk if i < n_beats - 1 else len(words)
+        beat_texts.append(" ".join(words[start:end]))
+
+    beats_response = FakeTextResponse(
+        json.dumps({"beats": [{"beat": n, "text": t} for n, t in zip(beat_names, beat_texts)]})
+    )
     prompts_response = FakeTextResponse(
-        json.dumps({"prompts": [{"beat": "1", "prompt": "a blue square"}]})
+        json.dumps({"prompts": [{"beat": n, "prompt": "a blue square"} for n in beat_names]})
     )
     image_response = FakeImageResponse(jpeg_bytes, mime_type="image/jpeg")
     review_response = FakeTextResponse(
         json.dumps({"ok": True, "problems": [], "revised_prompt": ""})
     )
 
+    # 1_plan.py draws every beat's still in one loop, THEN reviews every
+    # beat's still in a separate loop afterward - not interleaved - so the
+    # queue needs every image response before any review response.
+    responses = (
+        [beats_response, prompts_response]
+        + [image_response] * len(beat_names)
+        + [review_response] * len(beat_names)
+    )
+
     # One FakeClient instance shared across every gem.client() call in this
     # run - a fresh FakeClient per call (e.g. a plain lambda constructing one
     # each time) would hand every call the same first queued item forever,
     # since each would get its own untouched copy of the queue.
-    plan_client = FakeClient([beats_response, prompts_response, image_response, review_response])
+    plan_client = FakeClient(responses)
     monkeypatch.setattr(gem, "client", lambda: plan_client)
     plan_cli.main(["--out", str(project_dir)])
 
     assert (project_dir / "plan.json").exists()
     assert (project_dir / "contact_sheet.png").exists()
-    assert (project_dir / "frames" / "1.png").exists()
+    for n in beat_names:
+        assert (project_dir / "frames" / f"{n}.png").exists()
     plan_data = json.loads((project_dir / "plan.json").read_text())
     assert plan_data["style_source"] == str(project_dir / "style_block.txt")
 
@@ -502,3 +591,44 @@ def test_make_stops_immediately_on_an_unrecoverable_inpoint_error(
 
     with pytest.raises(SystemExit, match="Stopped at beat 1"):
         make_cli.main(["--project", str(project_dir)])
+
+
+@requires_ffmpeg
+@requires_drawtext
+@requires_google_genai
+def test_make_paces_choose_inpoint_calls_between_shots(plan_cli, make_cli, tmp_path, monkeypatch):
+    # Found live, 2026-09-06: choose_inpoint() makes one gem.ask() call per
+    # shot with no pause between shots, unlike the clip-generation loop
+    # (which deliberately sleeps between shots for exactly this reason) -
+    # a real 12-beat run started tripping the ~2/minute rate limit on the
+    # last few shots as a result. Verifies pacing sleeps happen between
+    # calls (n-1 of them for n shots, not after the last one) rather than
+    # trusting the source reads correctly.
+    from lib import edit
+
+    project_dir = _run_plan_then_prepare_make(plan_cli, tmp_path, monkeypatch, n_beats=3)
+
+    # Clip generation, music and the actual in-point logic aren't what this
+    # test is about - skip all three by pre-creating/stubbing them, the same
+    # "already done" pattern used by the sibling tests above.
+    gen_dir = project_dir / "gen"
+    gen_dir.mkdir()
+    for n in ("1", "2", "3"):
+        (gen_dir / f"beat_{n}.mp4").write_bytes(
+            b"not a real clip - existence is all that's checked"
+        )
+    (project_dir / "audio" / "music_bed.mp3").write_bytes(b"not real music")
+    monkeypatch.setattr(edit, "choose_inpoint", lambda *a, **k: (0.5, False, "stub"))
+
+    # edit.build() is the very next real work after the choose_inpoint loop -
+    # raising from it marks "the loop finished" without needing a real
+    # ffmpeg build, real music, or real playable clips at all.
+    marker = RuntimeError("stop here - loop already finished")
+    monkeypatch.setattr(edit, "build", lambda *a, **k: (_ for _ in ()).throw(marker))
+
+    sleeps = []
+    monkeypatch.setattr(make_cli.time, "sleep", lambda s: sleeps.append(s))
+    with pytest.raises(RuntimeError, match="stop here"):
+        make_cli.main(["--project", str(project_dir)])
+
+    assert sleeps == [gem.TEXT_MODEL_PACING_SECONDS] * 2  # 3 shots, paced between each pair

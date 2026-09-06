@@ -276,6 +276,11 @@ def main(argv=None):  # noqa: C901 - a linear script's main(), not a candidate f
         if rev:
             sh["reverse"] = True
         gem.say(f"  {sh['beat']}: from {ip:.1f}s{'  (reversed)' if rev else ''}  {why}")
+        if i < len(shots) - 1:
+            # One gem.ask() call per shot, back to back, otherwise trips the
+            # ~2/minute rate limit near the end of a long loop - see
+            # gem.TEXT_MODEL_PACING_SECONDS.
+            time.sleep(gem.TEXT_MODEL_PACING_SECONDS)
 
     cfg = {
         "video": P["video"],

@@ -267,6 +267,15 @@ BACKOFF_BASE_SECONDS = 5
 BACKOFF_CAP_SECONDS = 60
 BACKOFF_JITTER_SECONDS = 3
 
+# TROUBLESHOOTING.md documents this model's rate limit as roughly two
+# requests a minute. A loop making one ask() call per item (choose_inpoint
+# per shot, review_still per beat) needs to pace itself at least this far
+# apart, or it trips that limit near the end of a long loop even though
+# each individual call's own retry backoff (above) looks fine in isolation -
+# found live, 2026-09-06, when a real 12-beat run's in-point selection
+# started failing on the last few shots for exactly this reason.
+TEXT_MODEL_PACING_SECONDS = 30
+
 
 def _backoff_base(attempt):
     """Exponential, uncapped-until-the-cap: 5s, 10s, 20s, 40s, then 60s."""

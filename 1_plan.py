@@ -23,6 +23,7 @@ import json
 import os
 import pathlib
 import sys
+import time
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 from lib import gem, media, plan  # noqa: E402
@@ -131,8 +132,8 @@ def main(argv=None):  # noqa: C901 - a linear script's main(), not a candidate f
                 f"${gem.spent_so_far():.2f} spent so far).\n\n{e}\n"
             )
         except Exception:
-            continue
-        if not v.get("ok") and v.get("revised_prompt"):
+            v = None
+        if v is not None and not v.get("ok") and v.get("revised_prompt"):
             why = "; ".join(v.get("problems", []))[:70]
             gem.say(f"  {b['beat']}: {why} - redrawing")
             prompts[b["beat"]] = v["revised_prompt"]
@@ -140,6 +141,13 @@ def main(argv=None):  # noqa: C901 - a linear script's main(), not a candidate f
                 b["beat"], prompts[b["beat"]], style, outdir=str(frames_dir), force=True
             )
             fixed += 1
+        if i < len(beats) - 1:
+            # One gem.ask() call per beat, back to back, otherwise trips the
+            # ~2/minute rate limit near the end of a long loop - see
+            # gem.TEXT_MODEL_PACING_SECONDS. Applies whether the call
+            # succeeded or failed non-fatally; either way it counted against
+            # the limit.
+            time.sleep(gem.TEXT_MODEL_PACING_SECONDS)
     gem.say(f"  redrew {fixed} of {len(beats)}.")
 
     order = [b["beat"] for b in beats]
