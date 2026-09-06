@@ -39,21 +39,27 @@ Return JSON only:
 """
 
 
-def choose_inpoint(clip_path, beat_text, dur, work="work"):
-    clip = float(probe(clip_path) or 8.0)
-    maxin = max(0.0, clip - dur)
-    n = 6
-    times = [clip * (i + 0.5) / n for i in range(n)]
-    # ffprobe returns one line per stream; the audio stream's rate is "0/0", so
-    # take the first line only and fall back to 24 if it is not a real rate.
-    raw = (probe(clip_path, "stream=r_frame_rate").splitlines() or ["24/1"])[0]
+def _parse_fps(raw):
+    """Parse ffprobe's stream=r_frame_rate output (one line per stream, video
+    first; the audio stream's rate is "0/0") into a frames-per-second float.
+    Falls back to 24.0 for anything that isn't a clean positive ratio."""
+    line = (raw.splitlines() or ["24/1"])[0]
     try:
-        num, den = raw.split("/")
+        num, den = line.split("/")
         fps = float(num) / (float(den) or 1)
         if fps <= 0:
             fps = 24.0
     except (ValueError, ZeroDivisionError):
         fps = 24.0
+    return fps
+
+
+def choose_inpoint(clip_path, beat_text, dur, work="work"):
+    clip = float(probe(clip_path) or 8.0)
+    maxin = max(0.0, clip - dur)
+    n = 6
+    times = [clip * (i + 0.5) / n for i in range(n)]
+    fps = _parse_fps(probe(clip_path, "stream=r_frame_rate"))
     sel = "+".join(f"eq(n\\,{int(round(t * fps))})" for t in times)
     strip = f"{work}/_strip.png"
     os.makedirs(work, exist_ok=True)
@@ -108,8 +114,14 @@ def check_frames(video, shots, work="work"):
 
 # ---------------------------------------------------------------- build ------
 def _ass_time(t):
-    h = int(t // 3600); m = int(t % 3600 // 60); s = t % 60
-    return f"{h}:{m:02d}:{s:05.2f}"
+    # Round to whole centiseconds once, up front, and decompose that integer -
+    # rounding t's seconds field with "%05.2f" after the fact can produce an
+    # invalid "60.00", instead of carrying into the minutes field.
+    cs = round(t * 100)
+    h, cs = divmod(cs, 360000)
+    m, cs = divmod(cs, 6000)
+    s, cs = divmod(cs, 100)
+    return f"{h}:{m:02d}:{s:02d}.{cs:02d}"
 
 
 def _chunks(text, per=6):

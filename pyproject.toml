@@ -1,0 +1,17 @@
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "tier1: pure functions, no I/O, no network",
+    "tier2: real ffmpeg on synthetic fixtures, no API key",
+    "tier3: recorded-response replay, no live network",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "C90", "B", "UP"]
+
+[tool.ruff.format]
+quote-style = "double"
