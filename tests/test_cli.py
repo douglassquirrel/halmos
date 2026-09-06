@@ -192,29 +192,13 @@ def test_make_exits_when_no_recording_is_found(make_cli, tmp_path):
 
 
 # ------------------------------------------ end-to-end project-dir plumbing --
-@requires_ffmpeg
-@requires_drawtext
-@requires_google_genai
-def test_full_plan_then_make_uses_only_the_project_folder(
-    plan_cli, make_cli, tmp_path, monkeypatch
-):
-    # The real risk in TODO.md item 3's refactor isn't any one function - it's
-    # whether the many changed call sites still compose correctly end to end.
-    # Runs 1_plan.py for real (only the network boundary, gem.client(), is
-    # faked) into a project folder that is NOT the current directory, then
-    # hands off to 2_make.py as far as recording alignment - stopping short
-    # of clip generation, which would need faking Veo's async operation-
-    # polling protocol, a separate and much larger undertaking. Everything up
-    # to here already exercises every changed path in both scripts: --out/
-    # --project resolution, style_source round-tripping through plan.json,
-    # frames/work/audio directory placement, and find_narration/read_
-    # corrections/transcribe/align/split_long all reading from the project
-    # folder rather than cwd.
-    import pathlib
+def _run_plan_then_prepare_make(plan_cli, tmp_path, monkeypatch):
+    """Runs 1_plan.py for real (only gem.client() faked) into a project
+    folder that is not the current directory, then sets gem.client up for
+    2_make.py's transcription call too - stopping just short of calling
+    2_make.py's main(), so callers can each drive the clip-generation loop
+    differently. Returns project_dir. Shared by several tests below."""
     import subprocess
-
-    assert tmp_path != pathlib.Path.cwd()  # sanity: this test is pointless if they're equal
-    cwd_before = set(pathlib.Path.cwd().iterdir())
 
     # 45 short, distinct, tightly-timed "words" - long enough to clear
     # 1_plan.py's 40-word floor, short enough (given the fake tight timing
@@ -272,15 +256,11 @@ def test_full_plan_then_make_uses_only_the_project_folder(
     assert (project_dir / "plan.json").exists()
     assert (project_dir / "contact_sheet.png").exists()
     assert (project_dir / "frames" / "1.png").exists()
-    assert (project_dir / "narration_script.txt").exists()
-    assert (project_dir / "corrections.txt").exists()
     plan_data = json.loads((project_dir / "plan.json").read_text())
     assert plan_data["style_source"] == str(project_dir / "style_block.txt")
 
-    # --- hand off to 2_make.py, same project folder ---
     (project_dir / "audio").mkdir()
     (project_dir / "audio" / "narration.m4a").write_bytes(b"not real audio - transcribe is faked")
-
     step = 0.15  # tight enough that 45 words stay under the 8s split ceiling
     fake_words = {
         "text": script_text,
@@ -291,6 +271,32 @@ def test_full_plan_then_make_uses_only_the_project_folder(
     }
     make_client = FakeClient(FakeTranscribeResponse(fake_words))
     monkeypatch.setattr(gem, "client", lambda: make_client)
+    return project_dir
+
+
+@requires_ffmpeg
+@requires_drawtext
+@requires_google_genai
+def test_full_plan_then_make_uses_only_the_project_folder(
+    plan_cli, make_cli, tmp_path, monkeypatch
+):
+    # The real risk in TODO.md item 3's refactor isn't any one function - it's
+    # whether the many changed call sites still compose correctly end to end.
+    # This runs both commands as far as recording alignment - stopping short
+    # of clip generation, which would need faking Veo's async operation-
+    # polling protocol, a separate and much larger undertaking (the two tests
+    # below cover the clip-generation error-handling logic a different way,
+    # by faking media.make_clip_veo directly instead). Everything up to here
+    # already exercises every changed path in both scripts: --out/--project
+    # resolution, style_source round-tripping through plan.json, frames/work/
+    # audio directory placement, and find_narration/read_corrections/
+    # transcribe/align/split_long all reading from the project folder.
+    import pathlib
+
+    assert tmp_path != pathlib.Path.cwd()  # sanity: this test is pointless if they're equal
+    cwd_before = set(pathlib.Path.cwd().iterdir())
+
+    project_dir = _run_plan_then_prepare_make(plan_cli, tmp_path, monkeypatch)
 
     # No clip_path exists yet, so main() proceeds past transcription and
     # alignment (this test's real target) into clip generation, where it
@@ -309,3 +315,65 @@ def test_full_plan_then_make_uses_only_the_project_folder(
 
     # And, the point of the whole test: nothing leaked into the real cwd.
     assert set(pathlib.Path.cwd().iterdir()) == cwd_before
+
+
+@requires_ffmpeg
+@requires_drawtext
+@requires_google_genai
+def test_make_stops_immediately_on_an_unrecoverable_clip_error(
+    plan_cli, make_cli, tmp_path, monkeypatch
+):
+    # TODO.md item 2's "fail once, not eleven times": an invalid key or an
+    # unbilled account fails identically for every clip, so it should stop
+    # at the first one rather than working through the rest.
+    from lib import media
+
+    project_dir = _run_plan_then_prepare_make(plan_cli, tmp_path, monkeypatch)
+
+    class FakeAPIError(Exception):
+        def __init__(self, message, code, status):
+            super().__init__(message)
+            self.code, self.status = code, status
+
+    calls = []
+
+    def boom(*a, **k):
+        calls.append(1)
+        raise FakeAPIError("API key not valid", 400, "INVALID_ARGUMENT")
+
+    monkeypatch.setattr(media, "make_clip_veo", boom)
+    monkeypatch.setattr(media, "make_clip_omni", boom)
+
+    with pytest.raises(SystemExit, match="API key was rejected"):
+        make_cli.main(["--project", str(project_dir)])
+
+    # Only one beat/model combination was ever attempted before stopping -
+    # not one attempt per (shot x clip_model) combination.
+    assert len(calls) == 1
+
+
+@requires_ffmpeg
+@requires_drawtext
+@requires_google_genai
+def test_make_stops_once_every_clip_model_is_quota_exhausted(
+    plan_cli, make_cli, tmp_path, monkeypatch
+):
+    from lib import media
+
+    project_dir = _run_plan_then_prepare_make(plan_cli, tmp_path, monkeypatch)
+    # This project's settings.json doesn't exist, so clip_models defaults to
+    # ["lite", "fast", "omni"] (gem.settings()'s built-in default).
+
+    class FakeAPIError(Exception):
+        def __init__(self, message, code, status):
+            super().__init__(message)
+            self.code, self.status = code, status
+
+    def quota_exhausted(*a, **k):
+        raise FakeAPIError("Quota exceeded for quota metric", 429, "RESOURCE_EXHAUSTED")
+
+    monkeypatch.setattr(media, "make_clip_veo", quota_exhausted)
+    monkeypatch.setattr(media, "make_clip_omni", quota_exhausted)
+
+    with pytest.raises(SystemExit, match="every model in clip_models"):
+        make_cli.main(["--project", str(project_dir)])

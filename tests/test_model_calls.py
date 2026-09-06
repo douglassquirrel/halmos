@@ -43,10 +43,31 @@ def test_ask_raises_after_exhausting_retries_on_malformed_json(monkeypatch, isol
     monkeypatch.setattr(gem, "client", lambda: FakeClient(FakeTextResponse("not json at all")))
     sleeps = []
     monkeypatch.setattr(gem.time, "sleep", lambda s: sleeps.append(s))
+    monkeypatch.setattr(gem.random, "uniform", lambda a, b: 0)  # deterministic: no jitter
     with pytest.raises(RuntimeError, match="model call failed after 3 tries"):
         gem.ask("some prompt", retries=3)
-    # One sleep per failed attempt, with the documented fixed backoff.
-    assert sleeps == [2, 5, 8]
+    # One sleep per failed attempt EXCEPT the last (no point backing off
+    # right before giving up), following the documented exponential backoff.
+    assert sleeps == [gem._backoff_base(0), gem._backoff_base(1)]
+
+
+def test_ask_does_not_retry_an_unrecoverable_error(monkeypatch, isolated_home):
+    # bad_key/billing/quota/model_not_found can't be fixed by retrying - a
+    # regression here would mean an invalid key fails identically eleven
+    # times instead of once, exactly what TODO.md's "fail once" item warned
+    # against.
+    class FakeAPIError(Exception):
+        def __init__(self, message, code, status):
+            super().__init__(message)
+            self.code, self.status = code, status
+
+    bad_key_response = FakeAPIError("API key not valid", 400, "INVALID_ARGUMENT")
+    calls = []
+    monkeypatch.setattr(gem, "client", lambda: FakeClient([bad_key_response]))
+    monkeypatch.setattr(gem.time, "sleep", lambda s: calls.append(s))
+    with pytest.raises(RuntimeError, match="API key was rejected"):
+        gem.ask("some prompt", retries=3)
+    assert calls == []  # never slept - failed on the very first attempt
 
 
 # -------------------------------------------------------- media.make_still() -

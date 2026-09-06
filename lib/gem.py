@@ -13,6 +13,7 @@ import json
 import logging
 import os
 import pathlib
+import random
 import re
 import subprocess
 import sys
@@ -181,6 +182,90 @@ def check_budget(about_to_spend, s=None):
         )
 
 
+# ------------------------------------------------------------ error classes --
+# Real shapes captured 2026-09-06 against the live API (see DIARY.md):
+# google.genai.errors.APIError exposes structured .code (int) and .status
+# (str) attributes, not just a message string -
+#   bad key:          400 INVALID_ARGUMENT, "API key not valid..."
+#   model deprecated:  404 NOT_FOUND, "models/x is not found for API version..."
+# RESOURCE_EXHAUSTED's two sub-cases (daily quota vs depleted prepayment) are
+# distinguished by wording in the message, per TROUBLESHOOTING.md; a bare
+# RESOURCE_EXHAUSTED with neither word is the per-minute rate limit, which
+# unlike the other two is genuinely worth retrying.
+def classify_error(exc):
+    """Sort an exception from a model call into one of:
+    "bad_key", "billing", "quota", "rate_limit", "model_not_found", "unknown".
+    Only the last two - "rate_limit" and "unknown" - are worth retrying."""
+    status = (getattr(exc, "status", "") or "").upper()
+    code = getattr(exc, "code", None)
+    message = str(exc)
+    lower = message.lower()
+
+    if status == "PERMISSION_DENIED" or code == 403:
+        return "bad_key"
+    if "api_key_invalid" in lower or "api key not valid" in lower:
+        return "bad_key"
+    if status == "NOT_FOUND" or code == 404:
+        return "model_not_found"
+    if status == "RESOURCE_EXHAUSTED" or code == 429:
+        if "prepayment" in lower or "billing" in lower:
+            return "billing"
+        if "quota" in lower:
+            return "quota"
+        return "rate_limit"
+    return "unknown"
+
+
+def explain_error(exc):
+    """A message a person can act on, for the error class classify_error()
+    found - falling back to the exception's own message for anything else."""
+    kind = classify_error(exc)
+    if kind == "bad_key":
+        return (
+            "Your API key was rejected. Check ~/.config/halmos/key (or "
+            "GEMINI_API_KEY) has the right key, with no extra spaces or "
+            "quotes around it. Get a new one at aistudio.google.com if in "
+            f"doubt.\n\n(Google said: {exc})"
+        )
+    if kind == "billing":
+        return (
+            "The Google account behind this key is out of prepayment credit. "
+            "Top it up at aistudio.google.com - nothing more will be charged "
+            f"until you do.\n\n(Google said: {exc})"
+        )
+    if kind == "quota":
+        return (
+            "Today's allowance for this model is used up. Nothing is lost - "
+            "wait until tomorrow and run the same command again; it carries "
+            f"on from where it stopped.\n\n(Google said: {exc})"
+        )
+    if kind == "model_not_found":
+        return (
+            "Google has retired or renamed a model this pipeline uses. The "
+            "model name constants live in lib/media.py (STILL_MODEL, CLIP, "
+            "OMNI_MODEL, MUSIC_MODEL, ASR_MODEL) and lib/gem.py (TEXT_MODEL) "
+            f"- one of those needs updating.\n\n(Google said: {exc})"
+        )
+    return str(exc)
+
+
+BACKOFF_BASE_SECONDS = 5
+BACKOFF_CAP_SECONDS = 60
+BACKOFF_JITTER_SECONDS = 3
+
+
+def _backoff_base(attempt):
+    """Exponential, uncapped-until-the-cap: 5s, 10s, 20s, 40s, then 60s."""
+    return min(BACKOFF_CAP_SECONDS, BACKOFF_BASE_SECONDS * (2**attempt))
+
+
+def backoff_delay(attempt):
+    """Exponential backoff with jitter, so several shots retrying at once
+    don't all retry in lockstep and re-trip a per-minute rate limit while
+    recovering from it."""
+    return _backoff_base(attempt) + random.uniform(0, BACKOFF_JITTER_SECONDS)
+
+
 # ------------------------------------------------------------- text model ----
 TEXT_MODEL = "gemini-3.5-flash"
 
@@ -225,9 +310,15 @@ def ask(prompt, images=None, want_json=True, retries=3):  # noqa: C901
             start = min([i for i in (txt.find("{"), txt.find("[")) if i >= 0] or [0])
             return json.loads(txt[start:])
         except Exception as e:  # noqa: BLE001
+            kind = classify_error(e)
+            if kind in ("bad_key", "billing", "quota", "model_not_found"):
+                # Retrying can't fix any of these - failing every one of the
+                # next eleven calls the same way helps nobody.
+                raise RuntimeError(explain_error(e)) from e
             last = e
-            time.sleep(2 + attempt * 3)
-    raise RuntimeError(f"model call failed after {retries} tries: {last}")
+            if attempt < retries - 1:
+                time.sleep(backoff_delay(attempt))
+    raise RuntimeError(f"model call failed after {retries} tries: {explain_error(last)}")
 
 
 # ------------------------------------------------------------ small utils ----

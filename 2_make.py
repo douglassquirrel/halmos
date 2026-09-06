@@ -181,6 +181,7 @@ def main(argv=None):  # noqa: C901 - a linear script's main(), not a candidate f
     )
     os.makedirs(gen_dir, exist_ok=True)
     done = len(shots) - len(need)
+    quota_exhausted_models = set()  # models confirmed out of today's allowance
     for sh in shots:
         b = sh["beat"]
         dst = clip_path(b)
@@ -206,22 +207,43 @@ def main(argv=None):  # noqa: C901 - a linear script's main(), not a candidate f
                         str(gen_dir),
                     )
             except Exception as e:  # noqa: BLE001
-                if "RESOURCE_EXHAUSTED" not in str(e) and "429" not in str(e):
+                kind = gem.classify_error(e)
+                if kind in ("bad_key", "billing", "model_not_found"):
+                    # None of these are fixed by trying another model or
+                    # shot - stop now rather than failing identically for
+                    # every remaining clip.
+                    sys.exit(
+                        f"\nStopped at beat {b} ({done}/{len(shots)} clips already made, "
+                        f"${gem.spent_so_far():.2f} spent so far).\n\n{gem.explain_error(e)}\n"
+                    )
+                if kind == "quota":
+                    quota_exhausted_models.add(m)
+                else:
                     gem.say(f"  {b}: {str(e)[:90]}")
                 made_it = None
             if made_it:
                 break
         done += 1
         gem.say(f"  [{done}/{len(shots)}] {b}" + ("" if made_it else "  NO CLIP"))
+        if not made_it and quota_exhausted_models.issuperset(s["clip_models"]):
+            # Every configured model is confirmed out of today's allowance -
+            # the remaining shots would each fail the same way.
+            sys.exit(
+                f"\nStopped at beat {b} ({done - 1}/{len(shots)} clips already made, "
+                f"${gem.spent_so_far():.2f} spent so far): every model in "
+                f"clip_models ({', '.join(s['clip_models'])}) has used up today's "
+                "allowance.\nNothing is lost - wait until tomorrow and run  "
+                "python3 2_make.py  again; it carries on from where it stopped.\n"
+            )
         time.sleep(12)
 
     missing = [sh["beat"] for sh in shots if not clip_path(sh["beat"]).exists()]
     if missing:
         sys.exit(
             f"\nCould not generate clips for: {', '.join(missing)}\n"
-            "This is almost always the daily limit. Nothing is lost - wait "
-            "until tomorrow and run  python3 2_make.py  again; it carries on "
-            "from where it stopped.\n"
+            f"${gem.spent_so_far():.2f} spent so far. This is almost always the "
+            "daily limit. Nothing is lost - wait until tomorrow and run  "
+            "python3 2_make.py  again; it carries on from where it stopped.\n"
         )
 
     # ---- 4. music -----------------------------------------------------------
