@@ -62,12 +62,21 @@ def test_build_output_has_one_video_and_one_audio_stream_with_expected_codecs(
 
 @requires_libass
 def test_build_audio_does_not_outrun_the_video(tmp_path, lavfi_clip, lavfi_audio):
-    # Regression for TODO.md bug #3: audio ran 3.2s past the end of the video
-    # because -shortest doesn't apply to a filter-graph output. Here the
-    # narration recording (5s) is deliberately much longer than the shots'
-    # total duration (2s), the way a real take that ran long would be - if
-    # the atrim in build()'s audio filter chain were ever removed or broken,
-    # the output audio stream would run to ~5s while the video stays at ~2s.
+    # Regression for TODO.md bug #3: audio once ran 3.2s past the end of the
+    # video because -shortest doesn't apply to a filter-graph output. The
+    # narration recording here (5s) is deliberately much longer than the
+    # shots' total duration (2s), the way a real take that ran long would be.
+    #
+    # build()'s audio chain now has two independent safeguards against this:
+    # the explicit `atrim=0:{total}` in the filter graph, and the global
+    # `-shortest` output flag. Verified by mutation-testing each alone (this
+    # ffmpeg version's -shortest already truncates filter-graph audio
+    # correctly on its own, so removing only atrim doesn't reproduce the
+    # historical bug) and both together (which does: audio comes back at the
+    # full ~5s while video stays at ~2s). This test asserts the *observable*
+    # behaviour - the two streams end up close together - regardless of which
+    # safeguard is doing the work, so it stays valid if either implementation
+    # detail changes as long as the guarantee holds.
     c1 = lavfi_clip("s0.mp4", duration=1.0, color="red")
     c2 = lavfi_clip("s1.mp4", duration=1.0, color="blue")
     narration = lavfi_audio("narration.m4a", duration=5.0, freq=300)
