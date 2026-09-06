@@ -8,19 +8,28 @@ between something that works and something that can be relied on.
 
 ---
 
-## 1. Tests and lint checks — mostly done
+## 1. Tests and lint checks — done
 
 **There is now a real test suite** (`tests/`, 117 tests) and `ruff`
-check/format both run clean. What's left:
+check/format both run clean.
 
-- **CI is still not set up.** Everything except the Tier 3 model-call tests
-  runs with no API key and no network, so it can run on every push — that
-  just hasn't been wired up as a GitHub Actions workflow yet. GitHub's Ubuntu
-  runners' `apt` ffmpeg typically includes `libass`/`drawtext` by default
-  (unlike Homebrew's slimmed `ffmpeg` formula, which needs `ffmpeg-full` —
-  see the "Before you start" section of `README.md`), so a plain
-  `apt-get install ffmpeg` should work in CI without needing anything
-  special, but this hasn't been verified on an actual runner.
+- **CI is now wired up** (`.github/workflows/tests.yml`): every push and PR
+  runs the full suite plus lint on `ubuntu-latest`, no secrets configured
+  because nothing in the suite needs a key or network — every tier
+  (including Tier 3, the recorded-response replay) runs against a
+  monkeypatched `gem.client()`, never a real one. (Earlier wording here said
+  only Tier 3 was network/key-free, which was stale — all three tiers are;
+  Tier 2 just additionally needs the `ffmpeg` binary present, and Tier 3
+  needs `google-genai` importable, both already handled by the
+  `requires_ffmpeg`/`requires_libass`/`requires_drawtext`/
+  `requires_google_genai` skip-guards in `tests/conftest.py`.) GitHub's
+  Ubuntu runners' `apt` ffmpeg typically includes `libass`/`drawtext` by
+  default (unlike Homebrew's slimmed `ffmpeg` formula, which needs
+  `ffmpeg-full` — see the "Before you start" section of `README.md`), so a
+  plain `apt-get install ffmpeg` was used rather than anything special —
+  first real run on an actual runner will confirm whether that assumption
+  holds; if it doesn't, the skip-guards mean Tier 2 skips cleanly rather
+  than failing.
 - The original four historical bugs, the three test tiers, and the lint pass
   are all done — see `SPEC.md`/`CLAUDE.md`/`DIARY.md` in the parent
   `halmos-code/` folder (not part of this repo) for the full account of how
