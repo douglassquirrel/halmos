@@ -13,6 +13,7 @@ clips that already exist are never paid for twice.
 | `ffmpeg is not installed` | Missing program | See README, "Before you start" |
 | `No option name near '...ass...'` during `2_make.py`'s final step | Your `ffmpeg` was built without the caption-rendering library | On a Mac, `brew install ffmpeg-full` (plain `brew install ffmpeg` doesn't include it) |
 | `The google-genai package is missing` | Missing add-on | `pip install google-genai` |
+| `error: externally-managed-environment` while installing google-genai | Your Python came from Homebrew, which blocks plain `pip install` system-wide | `pip3 install --user --break-system-packages google-genai` (see README). Or, if you'd rather not use those flags: `python3 -m venv ~/.halmos-venv && source ~/.halmos-venv/bin/activate && pip install google-genai` — then run halmos's own two commands with that same venv activated |
 | `style_block.txt still has the placeholder text` | The look has not been described yet | Edit `style_block.txt`. See `STYLE.md` |
 | `script.txt still has the placeholder text` | No script yet | Put your words in `script.txt` |
 | `No recording found` | The audio file is not where it is looked for | Save it as `audio/narration.m4a` (or `.mp3` / `.wav`) |

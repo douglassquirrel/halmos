@@ -62,6 +62,18 @@ Then install the one add-on this uses:
 pip install google-genai
 ```
 
+If that says "command not found", try `pip3` instead of `pip`. If it refuses
+with a message about an **"externally managed environment"** — common if your
+Python came from Homebrew rather than python.org — paste this instead:
+
+```
+pip3 install --user --break-system-packages google-genai
+```
+
+(Those two flags are Homebrew's own suggested way past that message, for
+installing one library like this rather than a whole project's worth. See
+`TROUBLESHOOTING.md` for another way, if you'd rather not use them.)
+
 ## 2. A Google API key
 
 1. Go to **aistudio.google.com** and sign in with a Google account.
