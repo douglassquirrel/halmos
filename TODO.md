@@ -8,87 +8,77 @@ between something that works and something that can be relied on.
 
 ---
 
-## 1. Tests and lint checks
+## 1. Tests and lint checks — mostly done
 
-**There are none.** Not one automated test, and no linter runs anywhere.
+**There is now a real test suite** (`tests/`, 117 tests) and `ruff`
+check/format both run clean. What's left:
 
-Every defect this project has had was found by running the whole pipeline end to
-end and looking at what came out, which costs money and the better part of an
-hour. Several of them would have been caught in a second by a test:
+- **CI is still not set up.** Everything except the Tier 3 model-call tests
+  runs with no API key and no network, so it can run on every push — that
+  just hasn't been wired up as a GitHub Actions workflow yet. GitHub's Ubuntu
+  runners' `apt` ffmpeg typically includes `libass`/`drawtext` by default
+  (unlike Homebrew's slimmed `ffmpeg` formula, which needs `ffmpeg-full` —
+  see the "Before you start" section of `README.md`), so a plain
+  `apt-get install ffmpeg` should work in CI without needing anything
+  special, but this hasn't been verified on an actual runner.
+- The original four historical bugs, the three test tiers, and the lint pass
+  are all done — see `SPEC.md`/`CLAUDE.md`/`DIARY.md` in the parent
+  `halmos-code/` folder (not part of this repo) for the full account of how
+  the suite was built, including two real bugs found while writing it
+  (`edit._ass_time()`'s invalid-timestamp bug, and `make_still()` writing
+  JPEG bytes into `.png`-named files) and one found in the installation
+  instructions themselves (`brew install ffmpeg` lacks the caption-rendering
+  library — see `README.md`).
 
-- `contact_sheet()` composited twelve stills into a picture of the first one.
-  `ffmpeg`'s `tile` filter tiles frames of one stream over time, not several
-  inputs. A test asserting that the sheet contains twelve distinct tiles would
-  have caught it.
-- The in-point chooser parsed frame rate from `ffprobe` output that has one line
-  per stream. The audio stream reports `0/0`, so the parse threw, so **every**
-  shot fell back to a centred crop — silently. A test with a real two-stream
-  file would have caught it.
-- The finished audio ran 3.2 seconds past the end of the video, because
-  `-shortest` does not apply to a filter-graph output. A test comparing the two
-  durations would have caught it.
-- A caption style keyed off the beat being named `"1"`, and stopped applying the
-  moment beat 1 got split in two.
+## 2. Handle errors from Gemini, and everything else, gracefully — partially done
 
-What is wanted:
+What's done, grounded in real error shapes captured against the live API
+(`google.genai.errors.APIError` exposes structured `.code`/`.status`
+attributes, not just a message string):
 
-- **Unit tests** for everything that does not call a model: the beat splitter's
-  word-for-word guarantee, `align()`, `find_retakes()`, `split_long()`, the
-  comment stripping in `style_block()`, `spent_so_far()`, `check_budget()`.
-  These are pure functions with awkward edge cases and they are where the
-  arithmetic bugs live.
-- **A fixture-based test for the ffmpeg chain.** Generate two seconds of tone
-  and colour bars with ffmpeg itself, run the real `build()` over them, and
-  assert on durations, stream count and measured loudness. No API key needed and
-  it costs nothing, which is the point: it can run on every commit.
-- **A recorded-response test for the model calls.** Save one real response from
-  each of `ask()`, `make_still()`, `transcribe()` and replay it, so the JSON
-  parsing and the retry logic are exercised without spending anything.
-- **Lint.** `ruff` and `black` would do. There is dead code in here and at least
-  one shadowed name; a linter finds those for free.
-- **CI.** Everything above except the model calls runs without a key, so it can
-  run on every push.
+- **RESOURCE_EXHAUSTED's two sub-cases are distinguished** — the daily quota
+  and a depleted prepayment balance now produce different, actionable
+  messages the moment they happen (`gem.classify_error()`/`gem.explain_error()`
+  in `lib/gem.py`), rather than looking the same.
+- **Fail once, not eleven times.** An invalid key, an unbilled account, or a
+  retired model name now stops the run immediately — in `gem.ask()`'s retry
+  loop and in `2_make.py`'s clip-generation loop — instead of failing the
+  same way for every remaining call. The clip loop also stops once every
+  configured model in `clip_models` is confirmed to have exhausted today's
+  quota, rather than working through the remaining shots the same way.
+- **Retries are honest.** `gem.ask()` uses exponential backoff with jitter
+  (`gem.backoff_delay()`) for the classes actually worth retrying (a bare
+  rate limit, or a genuinely transient failure), not a fixed 2/5/8s sequence
+  applied to everything including errors retrying can't fix.
+- **Model deprecation** now says which constant in `lib/media.py` (or
+  `lib/gem.py`) to change, instead of a bare 404.
+- **Say what it was doing** — done for clip generation specifically (the
+  scenario this item's own description uses as the example): the beat, how
+  many clips are already made, and money spent so far.
 
-## 2. Handle errors from Gemini, and everything else, gracefully
+What's still not done:
 
-Right now an API failure that is not a transient 429 usually surfaces as a
-traceback, and a run that dies at clip nine of twelve tells you very little about
-what it was doing or what it had already paid for.
+- **A persistent note about partial progress.** The improved exit messages
+  cover the immediate "what do I do now" need, but there's no separate
+  status file surviving between runs beyond what's already inferable from
+  which files exist in `gen/`. Whether that's worth adding on top of the
+  clearer messages is an open question, not a settled no.
+- **The non-Gemini failures.** A missing `ffmpeg` is already handled
+  (`media.need_ffmpeg()`); a bad recording format or a missing font file
+  mostly surface through `ffmpeg`'s own stderr via `lib/media.py`'s `run()`,
+  which is usually clear enough on its own but was never deliberately
+  improved. A full disk isn't handled specially anywhere — it would surface
+  as a raw `OSError`, which is at least self-explanatory ("No space left on
+  device") even unhandled.
+- **"Say what it was doing" beyond clip generation** — `choose_inpoint()`,
+  `check_frames()`, and the still-generation/review loop in `1_plan.py`
+  already degrade gracefully (best-effort fallbacks, not crashes) but don't
+  yet report beat/spend context the way the clip loop now does.
 
-Specifically:
+## 3. Never make the user edit the folder — done
 
-- **Distinguish the failures that mean different things.** `RESOURCE_EXHAUSTED`
-  is two completely different situations — the daily per-model quota, where the
-  answer is "come back tomorrow and re-run, nothing is lost", and an empty
-  prepayment balance, where the answer is "top up the account". They currently
-  look the same. `TROUBLESHOOTING.md` explains the difference; the program
-  should say it at the moment it happens.
-- **Say what it was doing.** Every failure should name the step, the beat, and
-  what has already been spent, because the next question is always "how much of
-  that do I have to pay for again?"
-- **Fail once, not eleven times.** An invalid key or an unbilled account fails
-  identically for every clip. Detect the unrecoverable class and stop.
-- **Retries should be honest.** `ask()` retries three times with a fixed backoff
-  and then raises the last exception. Rate limits want exponential backoff with
-  jitter, and the free-tier limit is two requests per minute — a retry storm is
-  how you trip it while recovering from it.
-- **Partial results should survive.** A crash in step 2 should leave the clips
-  already made, and it does; but it should also leave a note saying what is
-  missing, so re-running is obviously the right move rather than a gamble.
-- **Model deprecation.** When Google retires a model name the error is a flat
-  404 with no hint. It should say which constant in `lib/media.py` to change.
-- **The non-Gemini failures too.** A missing `ffmpeg`, a full disk, a recording
-  in a format that will not decode, a font file that does not exist.
-
-## 3. Never make the user edit the folder
-
-The biggest remaining awkwardness in the design. Today halmos expects to *be* the
-working directory: your words go in `script.txt` inside it, your look goes in
-`style_block.txt` inside it, and the outputs land in it. That means a copy of the
-whole toolkit per video, editing files inside a checked-out git repository, and
-`git status` showing your own writing as a local modification.
-
-It should be possible to install halmos once and never touch it again:
+`1_plan.py`/`2_make.py` now take `--script`, `--style`, and `--out`/
+`--project`:
 
 ```
 python3 1_plan.py  --script ~/videos/bees/script.txt \
@@ -97,41 +87,28 @@ python3 1_plan.py  --script ~/videos/bees/script.txt \
 python3 2_make.py  --project ~/videos/bees
 ```
 
-That means:
+With no flags, both commands behave exactly as before (the project folder
+defaults to the current directory). `settings.json` and `style_block.txt`
+resolve against the project folder, falling back to
+`~/.config/halmos/settings.json` for settings; `1_plan.py` records the
+resolved style path into `plan.json` as `"style_source"` so `2_make.py`
+picks up the same shared style automatically. Everything written —
+`frames/`, `gen/`, `work/`, `out/`, `plan.json`, `spend.log`,
+`corrections.txt`, `audio/` — now lands under the project folder.
 
-- `--script`, `--style`, `--out` / `--project` as command-line arguments, with
-  the current filenames as defaults so nothing breaks for anyone already using it.
-- `settings.json` found in the project folder, falling back to a user-level
-  default in `~/.config/halmos/settings.json`, so a house style and a spending
-  limit are set once rather than per video.
-- Everything written — `frames/`, `gen/`, `work/`, `out/`, `plan.json`,
-  `spend.log`, `corrections.txt` — under the project folder, not the current
-  directory. `SPEND` in `lib/gem.py` is a bare relative path today, so the spend
-  log lands wherever you happened to be standing.
-- A **shared style file** referenced by many projects, which is the whole point:
-  the look is meant to be the thing that stays the same across videos.
-- Ideally installable (`pip install halmos`, or just `pipx`), so `halmos plan`
-  and `halmos make` work from anywhere and the repository is never the working
-  directory at all.
+**Not done:** the "ideally `pip install halmos`" stretch goal. The two
+scripts are still run with `python3 1_plan.py` from wherever the checkout
+lives — just no longer *from inside* it. Turning this into an installable
+package with `halmos plan`/`halmos make` entry points is a separate,
+larger effort (packaging, an entry-point CLI wrapper, a PyPI listing) that
+this pass didn't attempt.
 
-The API key already works this way, and that is the model to follow: it lives in
-`~/.config/halmos/key`, halmos finds it, and nobody edits anything to make that
-happen.
+## 4. A written description of how the pipeline actually works — done
 
-## 4. A written description of how the pipeline actually works
-
-Right now there are two documents: `README.md`, which describes halmos from
-the outside as two commands to run, and this file, which describes what's
-missing. Neither describes what `1_plan.py` and `2_make.py` actually do
-underneath — the beat/prompt pipeline, what each still/clip/music call
-expects and returns, the edit/mux pipeline, the settings and spend model.
-
-That gap doesn't matter much for the one-person, run-it-yourself project this
-started as. It will start to matter as items 1 through 3 get worked on, and it
-matters most for anyone new picking this up cold — a contributor reading
-`lib/edit.py` for the first time has to reconstruct the shape of `cfg` and
-`shots` from usage rather than from anywhere written down.
-
-Not a rewrite of `README.md`'s user-facing walkthrough — a plain description
-of the machinery underneath it, for the next person (or the next session) who
-has to change it.
+See `ARCHITECTURE.md`: the beat/prompt pipeline, the model-calling and
+pure-function split in `lib/media.py` (including `cfg`'s shape, which
+`edit.build()`'s callers previously had to reconstruct from usage alone),
+the edit/mux pipeline, and the settings/spend model — plus a couple of
+structural gaps worth knowing about (no CLI test covers clip generation
+through the finished edit; see `ARCHITECTURE.md`'s own "Known structural
+gaps" section).
