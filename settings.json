@@ -1,0 +1,16 @@
+{
+  "video_name": "myvideo",
+
+  "music_mood": "warm and unhurried, with gentle forward motion",
+  "music_instruments": "soft piano and light strings",
+
+  "resolution": "1080p",
+  "target_lufs": -14,
+  "words_per_minute": 130,
+
+  "max_spend_usd": 20.0,
+  "clip_models": ["lite", "fast", "omni"],
+
+  "caption_font_file": "",
+  "caption_font_family": ""
+}

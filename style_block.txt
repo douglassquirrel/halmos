@@ -1,0 +1,29 @@
+# YOUR VISUAL STYLE
+#
+# Everything below the line is sent to the image and video models with EVERY
+# shot, so every picture in your video looks like it belongs with the others.
+# Replace it with whatever look you want. Lines starting with # are ignored.
+#
+# Read STYLE.md before editing — it explains what works and, more importantly,
+# what to forbid. The last few lines here are prohibitions; keep them unless you
+# have a reason not to. They exist because without them the models add things
+# nobody asked for.
+# ---------------------------------------------------------------------------
+
+Describe your look here: the medium, the lighting, the palette, the camera.
+Be specific about materials and colours. Say what it is made of and how it is lit.
+
+Composed for a tall vertical frame: the subject is close and large, filling the
+frame from top to bottom, with only a narrow margin around it.
+
+One single continuous image filling the whole frame: not a grid of panels, not a
+comic strip, not a storyboard, no dividing lines, no repeated copies of the
+subject, no before-and-after side by side.
+
+No text of any kind: no words, no letters, no numbers, no labels, no captions,
+no signs, no writing on anything.
+
+No photographic human hands, arms or bodies at any point. Objects move by
+themselves.
+
+No dialogue, no music, no on-screen text.

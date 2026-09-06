@@ -1,0 +1,32 @@
+# Never, ever commit a key. halmos keeps yours in ~/.config/halmos/key, outside
+# this folder entirely, but these lines are here in case one is ever put back.
+key.txt
+key
+*.key
+*key*.txt
+.env
+
+# Everything the two commands generate. (script.txt and style_block.txt are
+# tracked: they ship as templates and you edit them in place.)
+spend.log
+work/
+out/
+frames/
+gen/
+audio/
+plan.json
+corrections.txt
+contact_sheet.png
+narration_script.txt
+
+# Media, wherever it lands.
+*.mp4
+*.mp3
+*.m4a
+*.wav
+*.png
+
+# Housekeeping.
+__pycache__/
+*.pyc
+.DS_Store

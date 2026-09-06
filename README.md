@@ -1,0 +1,233 @@
+# Make a short video from a piece of writing
+
+You give this folder a paragraph of text and a recording of your own voice. It
+gives you back a finished vertical video — about a minute long, with pictures,
+captions, and music — ready to post.
+
+**You run two commands.** In between, you look at some pictures and record
+yourself reading. That is the whole thing.
+
+It costs **about £7 a video** and takes **about 45 minutes of your time**, spread
+over an hour or two of the computer working on its own.
+
+Everything is done by Google's Gemini models. You need one API key from Google
+and nothing else. **You never need to open a chatbot.**
+
+---
+
+# Before you start (once, about twenty minutes)
+
+## 1. Two programs
+
+Open a terminal — on a Mac, press ⌘-Space, type "Terminal", press Enter — and
+paste these in one at a time to check what you have:
+
+```
+python3 --version
+ffmpeg -version
+```
+
+If either says "command not found":
+
+- **Python** — download from python.org and install it.
+- **ffmpeg** — on a Mac, install Homebrew from brew.sh, then run
+  `brew install ffmpeg`. On Windows, download from ffmpeg.org. On Linux,
+  `sudo apt install ffmpeg`.
+
+Then install the one add-on this uses:
+
+```
+pip install google-genai
+```
+
+## 2. A Google API key
+
+1. Go to **aistudio.google.com** and sign in with a Google account.
+2. Click **Get API key**, then **Create API key**.
+3. **Turn on billing.** This is not optional — the video model has no free tier
+   and will simply refuse to work without it. Put about **£20** of credit on the
+   account. That is enough for two videos with room for mistakes.
+4. Copy the key.
+
+Now put the key in your home folder — **not in this folder**. Open a Terminal
+window and paste these two lines, with your own key in place of `YOUR-KEY-HERE`:
+
+```
+mkdir -p ~/.config/halmos
+printf %s 'YOUR-KEY-HERE' > ~/.config/halmos/key && chmod 600 ~/.config/halmos/key
+```
+
+That is all. Every video you ever make with halmos will find it there; you never
+do this step again.
+
+*On Windows*, create the file `.config\halmos\key` inside your user folder and
+put the key on the first line. Or, on any system, set an environment variable
+called `GEMINI_API_KEY` instead — halmos looks there first.
+
+**Why not just keep it in this folder?** Because folders get copied, zipped,
+emailed and put on GitHub, and keys go with them. Yours lives somewhere those
+things never reach.
+
+**Keep that key private.** It can spend money. Do not email it, do not paste it
+into a chat window, do not put it in a shared folder. If you think someone else
+has seen it, go back to aistudio.google.com, delete the key and make a new one —
+it takes ten seconds and costs nothing. Nothing in halmos ever copies your key
+anywhere, prints it, or writes it into any output.
+
+## 3. Your look
+
+Open **`style_block.txt`** and describe how you want your videos to look. This
+text is sent with every single picture, which is what makes them all look like
+they belong together.
+
+**Read `STYLE.md` before you write it.** It is short, and it explains the one
+thing that surprises everybody: what you *forbid* matters more than what you
+describe. Leave the prohibitions at the bottom of the file alone unless you have
+a reason to change them.
+
+## 4. Optional settings
+
+Open **`settings.json`** if you want to change the video's name, the mood of the
+music, or the spending limit. It is fine to leave it exactly as it is.
+
+---
+
+# Making a video
+
+## Step 1 — Write your script
+
+Open **`script.txt`** and replace it with about **130 words** of your own — that
+comes out around sixty seconds when spoken. Write it as you would say it. Do not
+describe any pictures; that is done for you.
+
+**Check your facts before this point.** Nothing here will check them for you, and
+a confident video repeating something untrue is worse than no video.
+
+## Step 2 — Run the first command
+
+```
+python3 1_plan.py
+```
+
+Two minutes, about 40p. It breaks your script into short beats, invents a picture
+for each one, draws them, checks its own work, and redraws anything that came out
+wrong.
+
+You get three things:
+
+- **`contact_sheet.png`** — all the pictures, with a label on each.
+- **`narration_script.txt`** — your script, laid out to read aloud.
+- **`corrections.txt`** — where you say if a picture is wrong.
+
+## Step 3 — Look at the pictures
+
+Open `contact_sheet.png`. For each picture ask: **does it actually say what that
+line of my script says?** Not "is it pretty" — does it carry the meaning.
+
+If any are wrong, open `corrections.txt` and write one line for each, like:
+
+```
+3a: too abstract, show an actual open door
+5b: there is writing on the sign
+```
+
+Say what is **wrong**. You do not have to say what to draw instead.
+
+**This is the cheapest moment in the whole process to change your mind.** A
+picture costs 3p to redraw here. The same change after step 5 costs about £7.
+
+If they all look fine, skip this and leave `corrections.txt` alone.
+
+## Step 4 — Record yourself
+
+Open `narration_script.txt` and read it aloud, recording as you go. Your phone's
+voice memo app is perfectly good.
+
+Four things:
+
+- **Pause about one second between each numbered line.** That is the only thing
+  this asks of you. Everything else adapts to how you speak.
+- **Read at whatever pace feels natural.**
+- **If you fluff a line, pause and say it again.** The bad take is found and
+  removed automatically. You never need to start over.
+- **Speak close to the microphone, in a quiet room.**
+
+Then put the file in this folder, in the `audio` folder, named `narration` —
+so `audio/narration.m4a`. (`.mp3` and `.wav` work too.)
+
+## Step 5 — Run the second command
+
+```
+python3 2_make.py
+```
+
+**About forty minutes and £7.** Most of that is waiting while each clip is
+generated, which takes a minute or two each. **It prints a line as each one
+finishes** — if it looks quiet, it is still working.
+
+It applies your corrections, listens to your recording and works out how long
+each beat took, removes any fluffed takes, generates a video clip for every shot,
+writes some music, picks the best few seconds of each clip, and builds the
+finished file.
+
+You get **`out/yourname.mp4`**.
+
+## Step 6 — Watch it
+
+**All the way through, with the sound on, before you put it anywhere.**
+
+This is the one step nothing can do for you. It has caught things every other
+check missed.
+
+---
+
+# If something goes wrong
+
+`TROUBLESHOOTING.md` has the common errors and what they mean. The two you are
+most likely to hit:
+
+- **"quota" or "RESOURCE_EXHAUSTED"** — you have used today's allowance of video
+  clips. Nothing is lost. Wait until tomorrow and run `python3 2_make.py` again;
+  it carries on from where it stopped and does not pay twice for clips it already
+  made.
+- **"prepayment credits are depleted"** — the account is out of money. Top it up
+  at aistudio.google.com. Nothing was charged.
+
+**Everything is safe to re-run.** Neither command undoes work that is already
+done.
+
+---
+
+# What is in this folder
+
+| | |
+|---|---|
+| `README.md` | This file. |
+| `STYLE.md` | How to describe your look, and what to forbid. Read before editing `style_block.txt`. |
+| `RULES.md` | Honesty rules. Short, and they matter if the video is for a business. |
+| `TROUBLESHOOTING.md` | Errors and what to do about them. |
+| `style_block.txt` | **Your look.** You edit this. |
+| `script.txt` | **Your words.** You edit this. |
+| `settings.json` | Name, music mood, spending limit. |
+| `corrections.txt` | Written for you by step 1; you edit it if a picture is wrong. |
+| `1_plan.py`, `2_make.py` | The two commands. |
+| `lib/` | The machinery. Nothing to change in here. |
+| `spend.log` | Every charge, as it happens, so you always know what a video cost. |
+
+---
+
+# What it costs
+
+Measured on a real video made this way:
+
+| | |
+|---|---|
+| Working out the beats and pictures | £0.05 |
+| 13 still pictures | £0.35 |
+| Listening to your recording | £0.01 |
+| 12 video clips | £6.76 |
+| Music | £0.06 |
+| **Total** | **about £7.20** |
+
+`settings.json` has a spending limit — £16 by default — and both commands stop
+before crossing it rather than after.
