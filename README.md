@@ -50,7 +50,10 @@ If either says "command not found":
 
 - **Python** — download from python.org and install it.
 - **ffmpeg** — on a Mac, install Homebrew from brew.sh, then run
-  `brew install ffmpeg`. On Windows, download from ffmpeg.org. On Linux,
+  `brew install ffmpeg-full`. (Plain `brew install ffmpeg` is missing the
+  caption-rendering library halmos needs, and `2_make.py` will fail at the
+  very last step after generating everything else — `ffmpeg-full` has
+  everything.) On Windows, download from ffmpeg.org. On Linux,
   `sudo apt install ffmpeg`.
 
 Then install the one add-on this uses:

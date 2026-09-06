@@ -11,6 +11,7 @@ clips that already exist are never paid for twice.
 | `RESOURCE_EXHAUSTED`, mentions **prepayment credits** | The Google account is out of money | Top it up at aistudio.google.com. Nothing was charged |
 | `429` errors coming quickly | Too many requests per minute (the limit is two) | Wait five minutes and re-run. Do not run two copies at once |
 | `ffmpeg is not installed` | Missing program | See README, "Before you start" |
+| `No option name near '...ass...'` during `2_make.py`'s final step | Your `ffmpeg` was built without the caption-rendering library | On a Mac, `brew install ffmpeg-full` (plain `brew install ffmpeg` doesn't include it) |
 | `The google-genai package is missing` | Missing add-on | `pip install google-genai` |
 | `style_block.txt still has the placeholder text` | The look has not been described yet | Edit `style_block.txt`. See `STYLE.md` |
 | `script.txt still has the placeholder text` | No script yet | Put your words in `script.txt` |
