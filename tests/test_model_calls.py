@@ -1,3 +1,6 @@
+import pathlib
+import subprocess
+
 import pytest
 from conftest import (
     FakeClient,
@@ -5,6 +8,7 @@ from conftest import (
     FakeTextResponse,
     FakeTranscribeResponse,
     fixture_text,
+    requires_ffmpeg,
     requires_google_genai,
 )
 
@@ -75,6 +79,53 @@ def test_make_still_skips_regenerating_an_existing_still(monkeypatch, isolated_h
     dst = media.make_still("1", "a prompt", "a style", outdir=str(outdir))
     assert dst == f"{outdir}/1.png"
     assert (outdir / "1.png").read_bytes() == b"already there"
+
+
+@requires_ffmpeg
+def test_make_still_converts_jpeg_bytes_to_a_real_png(monkeypatch, isolated_home, tmp_path):
+    # Real captured behaviour, 2026-09-06: a live call to the still-image
+    # model returned inline_data with mime_type "image/jpeg" - genuine JPEG
+    # bytes - even though make_still() names every file .png. Previously
+    # written verbatim: every still halmos ever generated was a JPEG wearing
+    # a .png extension. Uses a real ffmpeg-generated JPEG here, not a
+    # fabricated byte string, so this only passes if the bytes are actually
+    # re-encoded to a real PNG, not just copied through.
+    jpeg_path = tmp_path / "src.jpg"
+    subprocess.run(
+        [
+            "ffmpeg",
+            "-v",
+            "error",
+            "-y",
+            "-f",
+            "lavfi",
+            "-i",
+            "color=c=red:s=64x64",
+            "-frames:v",
+            "1",
+            "-f",
+            "image2",
+            "-vcodec",
+            "mjpeg",
+            str(jpeg_path),
+        ],
+        check=True,
+        capture_output=True,
+    )
+    jpeg_bytes = jpeg_path.read_bytes()
+    assert jpeg_bytes[:2] == b"\xff\xd8"  # real JPEG magic bytes, sanity check
+
+    monkeypatch.setattr(
+        gem,
+        "client",
+        lambda: FakeClient(FakeImageResponse(jpeg_bytes, mime_type="image/jpeg")),
+    )
+    outdir = tmp_path / "frames"
+    outdir.mkdir()
+    dst = media.make_still("1", "a prompt", "a style", outdir=str(outdir))
+
+    written = pathlib.Path(dst).read_bytes()
+    assert written[:8] == b"\x89PNG\r\n\x1a\n", "file is not actually a PNG"
 
 
 # --------------------------------------------------------- media.transcribe -

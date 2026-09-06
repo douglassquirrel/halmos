@@ -14,6 +14,7 @@ import logging
 import os
 import pathlib
 import re
+import subprocess
 import sys
 import time
 import warnings
@@ -216,6 +217,41 @@ def say(msg):
     print(f"[{time.strftime('%H:%M:%S')}] {msg}", flush=True)
 
 
+def _reencode_as_png(raw_bytes):
+    """The still-image model can return JPEG bytes even when the caller
+    wants a .png file (confirmed against a real response, 2026-09-06 - the
+    model returned mime_type "image/jpeg"). Re-encode via ffmpeg so the
+    file's actual format matches its name, instead of writing a JPEG wearing
+    a .png extension. Returns None if ffmpeg can't be found or fails, so the
+    caller can fall back to writing the original bytes rather than losing
+    the image entirely."""
+    try:
+        p = subprocess.run(
+            [
+                "ffmpeg",
+                "-v",
+                "error",
+                "-y",
+                "-f",
+                "image2pipe",
+                "-i",
+                "-",
+                "-frames:v",
+                "1",
+                "-f",
+                "image2",
+                "-vcodec",
+                "png",
+                "-",
+            ],
+            input=raw_bytes,
+            capture_output=True,
+        )
+    except FileNotFoundError:
+        return None
+    return p.stdout if p.returncode == 0 and p.stdout else None
+
+
 def save_first_image(resp, path):
     for cand in resp.candidates or []:
         for part in cand.content.parts or []:
@@ -226,6 +262,9 @@ def save_first_image(resp, path):
                     if isinstance(inline.data, (bytes, bytearray))
                     else base64.b64decode(inline.data)
                 )
+                mime = (getattr(inline, "mime_type", "") or "").lower()
+                if str(path).lower().endswith(".png") and mime and "png" not in mime:
+                    raw = _reencode_as_png(raw) or raw
                 pathlib.Path(path).parent.mkdir(parents=True, exist_ok=True)
                 pathlib.Path(path).write_bytes(raw)
                 return True

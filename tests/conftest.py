@@ -248,8 +248,9 @@ class FakePart:
 
 
 class FakeInlineData:
-    def __init__(self, data):
+    def __init__(self, data, mime_type=""):
         self.data = data
+        self.mime_type = mime_type
 
 
 class FakeContent:
@@ -267,8 +268,12 @@ class FakeCandidate:
 class FakeImageResponse:
     """Stands in for a make_still() generate_content() response."""
 
-    def __init__(self, image_bytes=None):
-        parts = [FakePart(inline_data=FakeInlineData(image_bytes))] if image_bytes else []
+    def __init__(self, image_bytes=None, mime_type=""):
+        parts = (
+            [FakePart(inline_data=FakeInlineData(image_bytes, mime_type=mime_type))]
+            if image_bytes
+            else []
+        )
         self.candidates = [FakeCandidate(parts=parts)]
 
 
