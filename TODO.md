@@ -97,20 +97,26 @@ attributes, not just a message string):
   `make_clip_omni`) still classify the raw exception themselves via
   `gem.classify_error()`, as the clip loop already did.
 
-What's still not done:
+What's still not done, **both decided against for now, 2026-09-06** (not
+forgotten, deliberately skipped until either turns into a real problem):
 
 - **A persistent note about partial progress.** The improved exit messages
-  cover the immediate "what do I do now" need, but there's no separate
-  status file surviving between runs beyond what's already inferable from
-  which files exist in `gen/`. Whether that's worth adding on top of the
-  clearer messages is an open question, not a settled no.
+  cover the immediate "what do I do now" need, and the pipeline's real state
+  already lives in the filesystem (`make_still`/clip generation both skip
+  work that already exists) — a separate status file would be a second
+  source of truth that could drift from the first. Not building it.
 - **The non-Gemini failures.** A missing `ffmpeg` is already handled
   (`media.need_ffmpeg()`); a bad recording format or a missing font file
-  mostly surface through `ffmpeg`'s own stderr via `lib/media.py`'s `run()`,
-  which is usually clear enough on its own but was never deliberately
-  improved. A full disk isn't handled specially anywhere — it would surface
-  as a raw `OSError`, which is at least self-explanatory ("No space left on
-  device") even unhandled.
+  mostly surface through `ffmpeg`'s own stderr via `lib/media.py`'s `run()`.
+  Unlike the Gemini error work, which had exactly four known, real, captured
+  error shapes to key off of, `ffmpeg` failures are far more varied
+  (codecs, corrupt files, permissions, disk space, missing fonts...) and
+  guessing at translations for all of them risks getting more of them wrong
+  than it helps. A full disk isn't handled specially anywhere either — it
+  would surface as a raw `OSError`, self-explanatory ("No space left on
+  device") even unhandled. Not worth building general `ffmpeg`-failure
+  classification speculatively; revisit if a specific case actually bites
+  someone.
 
 ## 3. Never make the user edit the folder — done
 
