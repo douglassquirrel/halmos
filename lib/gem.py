@@ -217,7 +217,12 @@ def classify_error(exc):
     if status == "NOT_FOUND" or code == 404:
         return "model_not_found"
     if status == "RESOURCE_EXHAUSTED" or code == 429:
-        if "prepayment" in lower or "billing" in lower:
+        # "prepayment" is the specific, real wording for a depleted account
+        # balance. A bare "billing" is NOT a reliable signal on its own -
+        # Google appends "check your plan and billing details" as generic
+        # boilerplate to most RESOURCE_EXHAUSTED messages, including real
+        # quota-exceeded ones, so check "quota" first.
+        if "prepayment" in lower:
             return "billing"
         if "quota" in lower:
             return "quota"

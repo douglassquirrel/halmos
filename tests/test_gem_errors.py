@@ -37,6 +37,30 @@ def test_classify_error_recognizes_depleted_prepayment():
     assert gem.classify_error(e) == "billing"
 
 
+def test_classify_error_prefers_quota_over_the_generic_billing_boilerplate():
+    # Real shape captured 2026-09-06 against the live API, during a real
+    # video-clip run: Google's actual RESOURCE_EXHAUSTED quota message ends
+    # with a generic "check your plan and billing details" suffix appended
+    # to essentially every 429, regardless of whether billing is the actual
+    # cause. A bare "billing" substring match wrongly classified this real
+    # quota message as "billing" - which is worse than just a wrong string:
+    # in 2_make.py's clip loop, a "billing" classification stops the whole
+    # run immediately, so the message ALSO meant the fast/omni fallback
+    # models were never even tried for a beat that only "lite" was capped
+    # on. Only "prepayment" (the wording in the real depleted-prepayment
+    # shape above) is a reliable billing signal; "quota" is what actually
+    # distinguishes this one.
+    e = FakeAPIError(
+        "You exceeded your current quota, please check your plan and billing "
+        "details. For more information on this error, head to: "
+        "https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your "
+        "current usage, head to: https://ai.dev/rate-limit. ",
+        429,
+        "RESOURCE_EXHAUSTED",
+    )
+    assert gem.classify_error(e) == "quota"
+
+
 def test_classify_error_recognizes_a_bare_rate_limit():
     # RESOURCE_EXHAUSTED without either "quota" or "prepayment" wording -
     # TROUBLESHOOTING.md's "429 errors coming quickly" case: too many
