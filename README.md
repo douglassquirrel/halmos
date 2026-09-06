@@ -252,6 +252,7 @@ done.
 | `STYLE.md` | How to describe your look, and what to forbid. Read before editing `style_block.txt`. |
 | `RULES.md` | Honesty rules. Short, and they matter if the video is for a business. |
 | `TROUBLESHOOTING.md` | Errors and what to do about them. |
+| `ARCHITECTURE.md` | How the pipeline actually works, for contributors. Not needed to use halmos. |
 | `style_block.txt` | **Your look.** You edit this. |
 | `styles/` | Three finished looks. Copy one over `style_block.txt` rather than starting from nothing. |
 | `script.txt` | **Your words.** You edit this. |
