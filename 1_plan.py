@@ -12,13 +12,17 @@ Writes  : contact_sheet.png   <- LOOK AT THIS
 
 Costs about 40p and takes two minutes.
 """
-import json, os, pathlib, sys
+
+import json
+import os
+import pathlib
+import sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
-from lib import gem, plan, media                                  # noqa: E402
+from lib import gem, media, plan  # noqa: E402
 
 
-def main():
+def main():  # noqa: C901 - a linear script's main(), not a candidate for this pass's scope
     gem.need_package()
     media.need_ffmpeg()
     s = gem.settings()
@@ -29,14 +33,17 @@ def main():
         sys.exit("There is no script.txt in this folder. Put your script in it.")
     script = script_file.read_text().strip()
     if script.startswith("Replace this file"):
-        sys.exit("script.txt still has the placeholder text in it.\n"
-                 "Put your own script in it and run this again.")
+        sys.exit(
+            "script.txt still has the placeholder text in it.\n"
+            "Put your own script in it and run this again."
+        )
     n = len(script.split())
     if n < 40:
         sys.exit(f"script.txt is only {n} words. That is too short to be a video.")
     if n > 400:
-        sys.exit(f"script.txt is {n} words, which is over three minutes. "
-                 "Split it into separate videos.")
+        sys.exit(
+            f"script.txt is {n} words, which is over three minutes. Split it into separate videos."
+        )
 
     gem.say(f"Script: {n} words, roughly {n / s['words_per_minute'] * 60:.0f} seconds spoken.")
 
@@ -76,13 +83,22 @@ def main():
     gem.say(f"  redrew {fixed} of {len(beats)}.")
 
     order = [b["beat"] for b in beats]
-    sheet = media.contact_sheet(order)
+    media.contact_sheet(order)
 
-    json.dump({"video": s["video_name"], "width": 1080, "height": 1920, "fps": 30,
-               "words_per_minute": s["words_per_minute"],
-               "beats": [{"beat": b["beat"], "text": b["text"],
-                          "prompt": prompts[b["beat"]]} for b in beats]},
-              open("plan.json", "w"), indent=2)
+    json.dump(
+        {
+            "video": s["video_name"],
+            "width": 1080,
+            "height": 1920,
+            "fps": 30,
+            "words_per_minute": s["words_per_minute"],
+            "beats": [
+                {"beat": b["beat"], "text": b["text"], "prompt": prompts[b["beat"]]} for b in beats
+            ],
+        },
+        open("plan.json", "w"),
+        indent=2,
+    )
 
     with open("narration_script.txt", "w") as f:
         f.write("READ THIS ALOUD AND RECORD IT\n")
@@ -115,7 +131,7 @@ def main():
 
     print()
     gem.say(f"Done. Spent ${gem.spent_so_far():.2f} so far.")
-    print(f"""
+    print("""
 NOW DO THESE THREE THINGS
 -------------------------
 

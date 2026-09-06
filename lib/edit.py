@@ -6,13 +6,44 @@ The edit: choosing which seconds of each clip to keep, and building the file.
 One judgement call in here (which window of the clip reads best) is made by a
 vision model. Everything else is deterministic ffmpeg.
 """
-import json, os, subprocess, sys, textwrap
-from . import gem
-from .media import run, probe
 
-FUNCTION_WORDS = {"a", "an", "the", "in", "of", "to", "and", "with", "that", "its",
-                  "for", "from", "by", "on", "at", "as", "it", "is", "was", "were",
-                  "be", "been", "or", "but", "so", "then", "this", "these"}
+import os
+import subprocess
+import textwrap
+
+from . import gem
+from .media import probe, run
+
+FUNCTION_WORDS = {
+    "a",
+    "an",
+    "the",
+    "in",
+    "of",
+    "to",
+    "and",
+    "with",
+    "that",
+    "its",
+    "for",
+    "from",
+    "by",
+    "on",
+    "at",
+    "as",
+    "it",
+    "is",
+    "was",
+    "were",
+    "be",
+    "been",
+    "or",
+    "but",
+    "so",
+    "then",
+    "this",
+    "these",
+}
 
 
 # ------------------------------------------------------------- in-points -----
@@ -63,15 +94,39 @@ def choose_inpoint(clip_path, beat_text, dur, work="work"):
     sel = "+".join(f"eq(n\\,{int(round(t * fps))})" for t in times)
     strip = f"{work}/_strip.png"
     os.makedirs(work, exist_ok=True)
-    run(["ffmpeg", "-v", "error", "-y", "-i", clip_path, "-vf",
-         f"select='{sel}',scale=180:-1,tile={n}x1", "-frames:v", "1", strip])
-    ans = gem.ask(INPOINT_RULES % {
-        "clip": clip, "dur": dur, "n": n, "maxin": maxin,
-        "times": ", ".join(f"{t:.1f}" for t in times), "text": beat_text},
-        images=[strip])
+    run(
+        [
+            "ffmpeg",
+            "-v",
+            "error",
+            "-y",
+            "-i",
+            clip_path,
+            "-vf",
+            f"select='{sel}',scale=180:-1,tile={n}x1",
+            "-frames:v",
+            "1",
+            strip,
+        ]
+    )
+    ans = gem.ask(
+        INPOINT_RULES
+        % {
+            "clip": clip,
+            "dur": dur,
+            "n": n,
+            "maxin": maxin,
+            "times": ", ".join(f"{t:.1f}" for t in times),
+            "text": beat_text,
+        },
+        images=[strip],
+    )
     val = float(ans.get("in", maxin / 2))
-    return (max(0.0, min(maxin, val)), bool(ans.get("reverse", False)),
-            str(ans.get("why", ""))[:90])
+    return (
+        max(0.0, min(maxin, val)),
+        bool(ans.get("reverse", False)),
+        str(ans.get("why", ""))[:90],
+    )
 
 
 # ----------------------------------------------------------- verification ----
@@ -92,13 +147,27 @@ frame are expected and are NOT a problem.
 def check_frames(video, shots, work="work"):
     t, times = 0.0, []
     for s in shots:
-        times.append(t + s["dur"] * 0.6); t += s["dur"]
+        times.append(t + s["dur"] * 0.6)
+        t += s["dur"]
     sel = "+".join(f"eq(n\\,{int(round(x * 30))})" for x in times)
     cols = 6
     rows = (len(times) + cols - 1) // cols
     sheet = f"{work}/_check.png"
-    run(["ffmpeg", "-v", "error", "-y", "-i", video, "-vf",
-         f"select='{sel}',scale=190:-1,tile={cols}x{rows}", "-frames:v", "1", sheet])
+    run(
+        [
+            "ffmpeg",
+            "-v",
+            "error",
+            "-y",
+            "-i",
+            video,
+            "-vf",
+            f"select='{sel}',scale=190:-1,tile={cols}x{rows}",
+            "-frames:v",
+            "1",
+            sheet,
+        ]
+    )
     try:
         out = gem.ask(CHECK_RULES, images=[sheet])
         probs = out.get("problems", [])
@@ -129,7 +198,8 @@ def _chunks(text, per=6):
     for w in words:
         cur.append(w)
         if len(cur) >= per and w.lower().strip(".,;:") not in FUNCTION_WORDS:
-            out.append(" ".join(cur)); cur = []
+            out.append(" ".join(cur))
+            cur = []
     if cur:
         if out and len(cur) < 3:
             out[-1] += " " + " ".join(cur)
@@ -139,7 +209,8 @@ def _chunks(text, per=6):
 
 
 def build(cfg, work="work", out="out"):
-    os.makedirs(work, exist_ok=True); os.makedirs(out, exist_ok=True)
+    os.makedirs(work, exist_ok=True)
+    os.makedirs(out, exist_ok=True)
     W, H, FPS = cfg["width"], cfg["height"], cfg["fps"]
     shots = cfg["shots"]
     family = cfg.get("caption_font_family") or "DejaVu Sans"
@@ -158,9 +229,24 @@ def build(cfg, work="work", out="out"):
             vf = "reverse," + vf + f",trim=start={ss}:duration={d},setpts=PTS-STARTPTS"
         elif ss:
             args += ["-ss", str(ss)]
-        args += ["-i", src, "-vf", vf, "-r", str(FPS),
-                 "-frames:v", str(int(round(d * FPS))),
-                 "-c:v", "libx264", "-preset", "veryfast", "-crf", "21", "-an", dst]
+        args += [
+            "-i",
+            src,
+            "-vf",
+            vf,
+            "-r",
+            str(FPS),
+            "-frames:v",
+            str(int(round(d * FPS))),
+            "-c:v",
+            "libx264",
+            "-preset",
+            "veryfast",
+            "-crf",
+            "21",
+            "-an",
+            dst,
+        ]
         run(args, f"cutting shot {sh['beat']}")
         parts.append(dst)
         meas.append(float(probe(dst)))
@@ -185,14 +271,17 @@ Format: Layer,Start,End,Style,Name,MarginL,MarginR,MarginV,Effect,Text
     for k, sh in enumerate(shots):
         d = meas[k]
         cs = _chunks(sh["text"])
-        wt = [len(c.split()) for c in cs]; tot = sum(wt) or 1
+        wt = [len(c.split()) for c in cs]
+        tot = sum(wt) or 1
         style = "Hook" if k == 0 else "Cap"
         ct = t
         for c, n in zip(cs, wt):
             cd = d * n / tot
             txt = c.replace("\n", " ")
             wrapped = "\\N".join(textwrap.wrap(txt, 26)) if len(txt) > 26 else txt
-            lines.append(f"Dialogue: 0,{_ass_time(ct)},{_ass_time(ct+cd)},{style},,0,0,0,,{wrapped}")
+            lines.append(
+                f"Dialogue: 0,{_ass_time(ct)},{_ass_time(ct + cd)},{style},,0,0,0,,{wrapped}"
+            )
             ct += cd
         t += d
     open(f"{work}/captions.ass", "w").write(head + "\n".join(lines) + "\n")
@@ -201,13 +290,30 @@ Format: Layer,Start,End,Style,Name,MarginL,MarginR,MarginV,Effect,Text
     with open(f"{work}/concat.txt", "w") as f:
         for p in parts:
             f.write(f"file '{os.path.basename(p)}'\n")
-    run(["ffmpeg", "-y", "-v", "error", "-f", "concat", "-safe", "0",
-         "-i", f"{work}/concat.txt", "-c", "copy", f"{work}/joined.mp4"], "joining")
+    run(
+        [
+            "ffmpeg",
+            "-y",
+            "-v",
+            "error",
+            "-f",
+            "concat",
+            "-safe",
+            "0",
+            "-i",
+            f"{work}/concat.txt",
+            "-c",
+            "copy",
+            f"{work}/joined.mp4",
+        ],
+        "joining",
+    )
 
-    nar = cfg.get("narration"); mus = cfg.get("music")
+    nar = cfg.get("narration")
+    mus = cfg.get("music")
     target = cfg.get("target_lufs", -14)
     FMT = "aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo"
-    fade = f",fade=t=out:st={max(0,total-1.2):.2f}:d=1.2"
+    fade = f",fade=t=out:st={max(0, total - 1.2):.2f}:d=1.2"
     final = f"{out}/{cfg['video']}.mp4"
     args = ["ffmpeg", "-y", "-v", "error", "-i", f"{work}/joined.mp4"]
 
@@ -217,35 +323,76 @@ Format: Layer,Start,End,Style,Name,MarginL,MarginR,MarginV,Effect,Text
         if use_music:
             args += ["-i", mus["file"]]
             g = mus.get("gain_db", -18)
-            af = (f"[0:v]ass={work}/captions.ass:fontsdir={fontdir}{fade}[vout];"
-                  f"[1:a]loudnorm=I=-16:TP=-1.5:LRA=11,{FMT},asplit=2[voice][key];"
-                  f"[2:a]loudnorm=I=-16:TP=-1.5,{FMT},volume={g}dB,afade=t=in:d=2,"
-                  f"afade=t=out:st={max(0,total-3):.2f}:d=3[bed];"
-                  f"[bed][key]sidechaincompress=threshold=0.03:ratio=6:attack=15:"
-                  f"release=450:makeup=1[duck];"
-                  f"[voice][duck]amix=inputs=2:duration=first:normalize=0,"
-                  f"loudnorm=I={target}:TP=-1:LRA=11,{FMT},"
-                  f"atrim=0:{total:.3f},asetpts=PTS-STARTPTS,"
-                  f"afade=t=out:st={max(0,total-0.8):.2f}:d=0.8[aout]")
+            af = (
+                f"[0:v]ass={work}/captions.ass:fontsdir={fontdir}{fade}[vout];"
+                f"[1:a]loudnorm=I=-16:TP=-1.5:LRA=11,{FMT},asplit=2[voice][key];"
+                f"[2:a]loudnorm=I=-16:TP=-1.5,{FMT},volume={g}dB,afade=t=in:d=2,"
+                f"afade=t=out:st={max(0, total - 3):.2f}:d=3[bed];"
+                f"[bed][key]sidechaincompress=threshold=0.03:ratio=6:attack=15:"
+                f"release=450:makeup=1[duck];"
+                f"[voice][duck]amix=inputs=2:duration=first:normalize=0,"
+                f"loudnorm=I={target}:TP=-1:LRA=11,{FMT},"
+                f"atrim=0:{total:.3f},asetpts=PTS-STARTPTS,"
+                f"afade=t=out:st={max(0, total - 0.8):.2f}:d=0.8[aout]"
+            )
             args += ["-filter_complex", af, "-map", "[vout]", "-map", "[aout]"]
         else:
-            args += ["-vf", f"ass={work}/captions.ass:fontsdir={fontdir}{fade}",
-                     "-af", f"loudnorm=I={target}:TP=-1:LRA=11,{FMT},"
-                            f"atrim=0:{total:.3f},asetpts=PTS-STARTPTS,"
-                            f"afade=t=out:st={max(0,total-0.8):.2f}:d=0.8"]
+            args += [
+                "-vf",
+                f"ass={work}/captions.ass:fontsdir={fontdir}{fade}",
+                "-af",
+                f"loudnorm=I={target}:TP=-1:LRA=11,{FMT},"
+                f"atrim=0:{total:.3f},asetpts=PTS-STARTPTS,"
+                f"afade=t=out:st={max(0, total - 0.8):.2f}:d=0.8",
+            ]
     else:
-        args += ["-f", "lavfi", "-t", str(total), "-i", "anullsrc=r=48000:cl=stereo",
-                 "-vf", f"ass={work}/captions.ass:fontsdir={fontdir}{fade}"]
-    args += ["-c:v", "libx264", "-preset", "veryfast", "-crf", "21",
-             "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "160k", "-shortest", final]
+        args += [
+            "-f",
+            "lavfi",
+            "-t",
+            str(total),
+            "-i",
+            "anullsrc=r=48000:cl=stereo",
+            "-vf",
+            f"ass={work}/captions.ass:fontsdir={fontdir}{fade}",
+        ]
+    args += [
+        "-c:v",
+        "libx264",
+        "-preset",
+        "veryfast",
+        "-crf",
+        "21",
+        "-pix_fmt",
+        "yuv420p",
+        "-c:a",
+        "aac",
+        "-b:a",
+        "160k",
+        "-shortest",
+        final,
+    ]
     run(args, "final mux")
     return final, total
 
 
 def loudness(path):
-    p = subprocess.run(["ffmpeg", "-hide_banner", "-nostats", "-i", path,
-                        "-af", "ebur128", "-f", "null", "/dev/null"],
-                       capture_output=True, text=True)
+    p = subprocess.run(
+        [
+            "ffmpeg",
+            "-hide_banner",
+            "-nostats",
+            "-i",
+            path,
+            "-af",
+            "ebur128",
+            "-f",
+            "null",
+            "/dev/null",
+        ],
+        capture_output=True,
+        text=True,
+    )
     for line in p.stderr.splitlines():
         s = line.strip()
         if s.startswith("I:") and "LUFS" in s:

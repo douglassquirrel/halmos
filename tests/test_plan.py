@@ -73,9 +73,7 @@ def test_split_into_beats_warns_about_beats_over_the_ceiling(monkeypatch):
     # (maxwords + 4) to trigger the warning.
     long_text = " ".join(["word"] * 13)
     script = long_text
-    monkeypatch.setattr(
-        gem, "ask", lambda *a, **k: {"beats": [{"beat": "1", "text": long_text}]}
-    )
+    monkeypatch.setattr(gem, "ask", lambda *a, **k: {"beats": [{"beat": "1", "text": long_text}]})
     said = []
     monkeypatch.setattr(gem, "say", lambda msg: said.append(msg))
     plan.split_into_beats(script, wpm=60)
@@ -84,9 +82,7 @@ def test_split_into_beats_warns_about_beats_over_the_ceiling(monkeypatch):
 
 def test_split_into_beats_does_not_warn_when_under_the_ceiling(monkeypatch):
     script = "word word word"
-    monkeypatch.setattr(
-        gem, "ask", lambda *a, **k: {"beats": [{"beat": "1", "text": script}]}
-    )
+    monkeypatch.setattr(gem, "ask", lambda *a, **k: {"beats": [{"beat": "1", "text": script}]})
     said = []
     monkeypatch.setattr(gem, "say", lambda msg: said.append(msg))
     plan.split_into_beats(script, wpm=130)

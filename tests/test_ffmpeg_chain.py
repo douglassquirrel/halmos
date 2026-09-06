@@ -1,8 +1,7 @@
 import pytest
+from conftest import pixel, requires_drawtext, requires_ffmpeg, requires_libass, stream_info
 
 from lib import edit, media
-
-from conftest import pixel, requires_drawtext, requires_ffmpeg, requires_libass, stream_info
 
 pytestmark = [pytest.mark.tier2, requires_ffmpeg]
 
@@ -41,9 +40,7 @@ def test_build_output_duration_matches_shot_durations(tmp_path, lavfi_clip):
 
 
 @requires_libass
-def test_build_output_has_one_video_and_one_audio_stream_with_expected_codecs(
-    tmp_path, lavfi_clip
-):
+def test_build_output_has_one_video_and_one_audio_stream_with_expected_codecs(tmp_path, lavfi_clip):
     c1 = lavfi_clip("s0.mp4", duration=1.0, color="green")
     shots = [{"beat": "1", "text": "hi", "dur": 1.0, "src": "1", "in": 0}]
     sources = {"1": {"file": str(c1)}}

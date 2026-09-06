@@ -1,7 +1,4 @@
 import pytest
-
-from lib import gem, media
-
 from conftest import (
     FakeClient,
     FakeImageResponse,
@@ -9,6 +6,8 @@ from conftest import (
     FakeTranscribeResponse,
     fixture_text,
 )
+
+from lib import gem, media
 
 pytestmark = pytest.mark.tier3
 

@@ -16,7 +16,7 @@ def _words(text, start=0.0, step=0.5, gap=0.1):
     return out
 
 
-# ----------------------------------------------------------------- purchased -
+# ------------------------------------------------- next_longest_available_clip
 @pytest.mark.parametrize(
     "dur,resolution,expected",
     [
@@ -31,8 +31,8 @@ def _words(text, start=0.0, step=0.5, gap=0.1):
         (8, "4k", 8),
     ],
 )
-def test_purchased_rounds_up_to_an_allowed_length(dur, resolution, expected):
-    assert media.purchased(dur, resolution) == expected
+def test_next_longest_available_clip_rounds_up_to_an_allowed_length(dur, resolution, expected):
+    assert media.next_longest_available_clip(dur, resolution) == expected
 
 
 # -------------------------------------------------------------- find_retakes -

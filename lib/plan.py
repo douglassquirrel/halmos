@@ -7,9 +7,11 @@ This is the part that used to need a person thinking. It is now two calls to a
 Gemini text model with carefully written instructions, plus a vision call that
 marks its own homework by looking at the pictures it asked for.
 """
-import json, pathlib, re
-from . import gem
 
+import json
+import re
+
+from . import gem
 
 # --------------------------------------------------------------- beats -------
 BEAT_RULES = """You are preparing a short vertical explainer video.
@@ -80,29 +82,30 @@ Return JSON only:
 def split_into_beats(script_text, wpm):
     maxwords = int(8 * wpm / 60)
     out = gem.ask(
-        (BEAT_RULES % {"wpm": wpm, "maxwords": maxwords})
-        + "\n\nSCRIPT:\n" + script_text.strip())
+        (BEAT_RULES % {"wpm": wpm, "maxwords": maxwords}) + "\n\nSCRIPT:\n" + script_text.strip()
+    )
     beats = out["beats"]
 
     # Trust but verify: every word must survive, in order.
     def words(s):
         return re.findall(r"[a-z0-9']+", s.lower())
+
     if words(" ".join(b["text"] for b in beats)) != words(script_text):
         raise ValueError(
             "The beat split changed the wording of your script. Not continuing.\n"
-            "This is a model error - just run the same command again.")
+            "This is a model error - just run the same command again."
+        )
     long = [b["beat"] for b in beats if len(b["text"].split()) > maxwords + 4]
     if long:
-        gem.say(f"note: beats {long} may be over 8s; they will be split "
-                f"automatically after you record.")
+        gem.say(
+            f"note: beats {long} may be over 8s; they will be split automatically after you record."
+        )
     return beats
 
 
 def write_prompts(beats, style):
-    payload = json.dumps([{"beat": b["beat"], "text": b["text"]} for b in beats],
-                         indent=1)
-    out = gem.ask(PROMPT_RULES + "\n\nVISUAL STYLE:\n" + style +
-                  "\n\nBEATS:\n" + payload)
+    payload = json.dumps([{"beat": b["beat"], "text": b["text"]} for b in beats], indent=1)
+    out = gem.ask(PROMPT_RULES + "\n\nVISUAL STYLE:\n" + style + "\n\nBEATS:\n" + payload)
     got = {p["beat"]: p["prompt"] for p in out["prompts"]}
     missing = [b["beat"] for b in beats if b["beat"] not in got]
     if missing:
@@ -138,10 +141,15 @@ prohibition over describing harder. When ok=true, set revised_prompt to "".
 
 def review_still(image_path, beat_text, prompt, style):
     return gem.ask(
-        REVIEW_RULES + "\n\nVISUAL STYLE:\n" + style +
-        "\n\nSENTENCE THE PICTURE MUST CARRY:\n" + beat_text +
-        "\n\nPROMPT THAT PRODUCED IT:\n" + prompt,
-        images=[image_path])
+        REVIEW_RULES
+        + "\n\nVISUAL STYLE:\n"
+        + style
+        + "\n\nSENTENCE THE PICTURE MUST CARRY:\n"
+        + beat_text
+        + "\n\nPROMPT THAT PRODUCED IT:\n"
+        + prompt,
+        images=[image_path],
+    )
 
 
 # ------------------------------------------------------- user corrections ----
@@ -162,6 +170,11 @@ Return JSON only: {"prompts": [{"beat": "...", "prompt": "..."}]}
 
 def apply_corrections(items, style):
     """items: [{beat, text, prompt, note}] -> {beat: new_prompt}"""
-    out = gem.ask(CORRECTION_RULES + "\n\nVISUAL STYLE:\n" + style +
-                  "\n\nBEATS TO REVISE:\n" + json.dumps(items, indent=1))
+    out = gem.ask(
+        CORRECTION_RULES
+        + "\n\nVISUAL STYLE:\n"
+        + style
+        + "\n\nBEATS TO REVISE:\n"
+        + json.dumps(items, indent=1)
+    )
     return {p["beat"]: p["prompt"] for p in out["prompts"]}

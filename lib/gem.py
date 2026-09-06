@@ -7,14 +7,23 @@ Everything in this pipeline goes through here, so there is one place that knows
 how to find the key, one place that decides which model does what, and one place
 that records what was spent.
 """
-import base64, json, logging, os, pathlib, re, sys, time, warnings
+
+import base64
+import json
+import logging
+import os
+import pathlib
+import re
+import sys
+import time
+import warnings
 
 warnings.filterwarnings("ignore")
 logging.getLogger("google_genai").setLevel(logging.ERROR)
 logging.getLogger("google.genai").setLevel(logging.ERROR)
 
-HERE = pathlib.Path(__file__).resolve().parent.parent   # the halmos folder
-SPEND = pathlib.Path("spend.log")                        # written where you run
+HERE = pathlib.Path(__file__).resolve().parent.parent  # the halmos folder
+SPEND = pathlib.Path("spend.log")  # written where you run
 
 # The key lives outside this folder, in your own home directory, so that copying,
 # zipping, sharing or publishing the folder can never carry the key with it.
@@ -32,7 +41,8 @@ def key_instructions():
         f"  Windows - create the file {KEY_FILE} yourself and put the key on the\n"
         f"  first line, or set an environment variable called GEMINI_API_KEY.\n\n"
         f"  Get a key at aistudio.google.com. It needs billing switched on -\n"
-        f"  see README.md.\n")
+        f"  see README.md.\n"
+    )
 
 
 # ---------------------------------------------------------------- the key ----
@@ -58,8 +68,7 @@ def api_key():
                 if line.startswith("PASTE") or line == "YOUR-KEY-HERE":
                     break
                 return line
-        sys.exit(f"{KEY_FILE} exists but has no key in it.\n\n"
-                 + key_instructions())
+        sys.exit(f"{KEY_FILE} exists but has no key in it.\n\n" + key_instructions())
     sys.exit("No API key found.\n\n" + key_instructions())
 
 
@@ -69,15 +78,18 @@ def need_package():
     try:
         import google.genai  # noqa: F401
     except ImportError:
-        sys.exit("\nThe google-genai package is not installed.\n\n"
-                 "  Run this, then try again:\n"
-                 "      pip install google-genai\n\n"
-                 "  (If 'pip' is not found, try 'pip3' or 'python3 -m pip'.)\n")
+        sys.exit(
+            "\nThe google-genai package is not installed.\n\n"
+            "  Run this, then try again:\n"
+            "      pip install google-genai\n\n"
+            "  (If 'pip' is not found, try 'pip3' or 'python3 -m pip'.)\n"
+        )
 
 
 def client():
     need_package()
     from google import genai
+
     return genai.Client(api_key=api_key())
 
 
@@ -106,9 +118,11 @@ def style_block():
     body = [ln for ln in f.read_text().splitlines() if not ln.strip().startswith("#")]
     text = " ".join(" ".join(body).split())
     if text.startswith("Describe your look here"):
-        sys.exit("style_block.txt still has the placeholder text in it.\n"
-                 "Open it, describe the look you want, save, and run again.\n"
-                 "STYLE.md explains what to write.")
+        sys.exit(
+            "style_block.txt still has the placeholder text in it.\n"
+            "Open it, describe the look you want, save, and run again.\n"
+            "STYLE.md explains what to write."
+        )
     if len(text) < 60:
         sys.exit("style_block.txt looks empty. Describe the look you want in it.")
     return text
@@ -116,8 +130,7 @@ def style_block():
 
 # ------------------------------------------------------------------ spend ----
 def log_spend(kind, detail, usd, note=""):
-    SPEND.open("a").write(
-        f"{time.strftime('%F %T')}\t{kind}\t{detail}\t${usd:.4f}\t{note}\n")
+    SPEND.open("a").write(f"{time.strftime('%F %T')}\t{kind}\t{detail}\t${usd:.4f}\t{note}\n")
 
 
 def spent_so_far():
@@ -140,9 +153,11 @@ def check_budget(about_to_spend, s=None):
     cap = s["max_spend_usd"]
     now = spent_so_far()
     if now + about_to_spend > cap:
-        sys.exit(f"\nSTOPPING. This would spend ${now + about_to_spend:.2f} in total, "
-                 f"over the ${cap:.2f} ceiling in settings.json.\n"
-                 f"Already spent: ${now:.2f}. Raise the ceiling there if you meant to.")
+        sys.exit(
+            f"\nSTOPPING. This would spend ${now + about_to_spend:.2f} in total, "
+            f"over the ${cap:.2f} ceiling in settings.json.\n"
+            f"Already spent: ${now:.2f}. Raise the ceiling there if you meant to."
+        )
 
 
 # ------------------------------------------------------------- text model ----
@@ -157,20 +172,24 @@ def ask(prompt, images=None, want_json=True, retries=3):  # noqa: C901
     """
     c = client()
     from google.genai import types
+
     contents = []
-    for img in (images or []):
-        contents.append(types.Part.from_bytes(
-            data=pathlib.Path(img).read_bytes(), mime_type="image/png"))
+    for img in images or []:
+        contents.append(
+            types.Part.from_bytes(data=pathlib.Path(img).read_bytes(), mime_type="image/png")
+        )
     contents.append(prompt)
 
     last = None
     for attempt in range(retries):
         try:
             from google.genai import types as _t
+
             r = c.models.generate_content(
-                model=TEXT_MODEL, contents=contents,
-                config=_t.GenerateContentConfig(
-                    http_options=_t.HttpOptions(timeout=120_000)))
+                model=TEXT_MODEL,
+                contents=contents,
+                config=_t.GenerateContentConfig(http_options=_t.HttpOptions(timeout=120_000)),
+            )
             txt = (r.text or "").strip()
             u = r.usage_metadata
             ti = getattr(u, "prompt_token_count", 0) or 0
@@ -184,7 +203,7 @@ def ask(prompt, images=None, want_json=True, retries=3):  # noqa: C901
                 txt = m.group(1).strip()
             start = min([i for i in (txt.find("{"), txt.find("[")) if i >= 0] or [0])
             return json.loads(txt[start:])
-        except Exception as e:                       # noqa: BLE001
+        except Exception as e:  # noqa: BLE001
             last = e
             time.sleep(2 + attempt * 3)
     raise RuntimeError(f"model call failed after {retries} tries: {last}")
@@ -198,12 +217,15 @@ def say(msg):
 
 
 def save_first_image(resp, path):
-    for cand in (resp.candidates or []):
-        for part in (cand.content.parts or []):
+    for cand in resp.candidates or []:
+        for part in cand.content.parts or []:
             inline = getattr(part, "inline_data", None)
             if inline and inline.data:
-                raw = (inline.data if isinstance(inline.data, (bytes, bytearray))
-                       else base64.b64decode(inline.data))
+                raw = (
+                    inline.data
+                    if isinstance(inline.data, (bytes, bytearray))
+                    else base64.b64decode(inline.data)
+                )
                 pathlib.Path(path).parent.mkdir(parents=True, exist_ok=True)
                 pathlib.Path(path).write_bytes(raw)
                 return True

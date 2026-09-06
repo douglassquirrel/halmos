@@ -13,5 +13,11 @@ target-version = "py39"
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "C90", "B", "UP"]
 
+[tool.ruff.lint.per-file-ignores]
+# The ASS subtitle format's header lines are a fixed external spec, not
+# code - splitting them across lines wouldn't make them more readable, it
+# would just make them harder to compare against the format's own docs.
+"lib/edit.py" = ["E501"]
+
 [tool.ruff.format]
 quote-style = "double"
