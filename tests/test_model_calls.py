@@ -5,11 +5,12 @@ from conftest import (
     FakeTextResponse,
     FakeTranscribeResponse,
     fixture_text,
+    requires_google_genai,
 )
 
 from lib import gem, media
 
-pytestmark = pytest.mark.tier3
+pytestmark = [pytest.mark.tier3, requires_google_genai]
 
 
 # -------------------------------------------------------------- gem.ask() ----

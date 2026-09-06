@@ -51,6 +51,24 @@ requires_drawtext = pytest.mark.skipif(
 )
 
 
+def _can_import(module):
+    try:
+        __import__(module)
+        return True
+    except ImportError:
+        return False
+
+
+# Tier 3 stubs out the SDK client, but gem.ask()/media.make_still() still do
+# `from google.genai import types` unconditionally to build request config
+# objects - so this tier needs the package importable even though it never
+# makes a real call. Skip gracefully (matching requires_ffmpeg/_libass above)
+# rather than let a plain `pytest` outside the project's .venv hard-fail.
+requires_google_genai = pytest.mark.skipif(
+    not _can_import("google.genai"), reason="google-genai not installed (see .venv)"
+)
+
+
 @pytest.fixture
 def lavfi_clip(tmp_path):
     """Generate a tiny synthetic video+audio clip with ffmpeg itself: colour

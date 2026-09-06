@@ -5,6 +5,13 @@ markers = [
     "tier2: real ffmpeg on synthetic fixtures, no API key",
     "tier3: recorded-response replay, no live network",
 ]
+filterwarnings = [
+    # google-genai (2.22.0, the latest as of this writing) uses a private
+    # CPython typing internal that's slated for removal in Python 3.17.
+    # Upstream's bug to fix, not ours - narrowly scoped so a real
+    # DeprecationWarning from our own code still surfaces normally.
+    "ignore:.*_UnionGenericAlias.*:DeprecationWarning:google.genai.types",
+]
 
 [tool.ruff]
 line-length = 100
