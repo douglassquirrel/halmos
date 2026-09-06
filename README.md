@@ -25,7 +25,7 @@ of `styles/`), then `python3 1_plan.py`, record the narration it asks for, and
 ## Getting it
 
 ```
-git clone https://github.com/YOURNAME/halmos.git
+git clone https://github.com/douglassquirrel/halmos.git
 cd halmos
 ```
 
