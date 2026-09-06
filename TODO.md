@@ -117,3 +117,21 @@ That means:
 The API key already works this way, and that is the model to follow: it lives in
 `~/.config/halmos/key`, halmos finds it, and nobody edits anything to make that
 happen.
+
+## 4. A written description of how the pipeline actually works
+
+Right now there are two documents: `README.md`, which describes halmos from
+the outside as two commands to run, and this file, which describes what's
+missing. Neither describes what `1_plan.py` and `2_make.py` actually do
+underneath — the beat/prompt pipeline, what each still/clip/music call
+expects and returns, the edit/mux pipeline, the settings and spend model.
+
+That gap doesn't matter much for the one-person, run-it-yourself project this
+started as. It will start to matter as items 1 through 3 get worked on, and it
+matters most for anyone new picking this up cold — a contributor reading
+`lib/edit.py` for the first time has to reconstruct the shape of `cfg` and
+`shots` from usage rather than from anywhere written down.
+
+Not a rewrite of `README.md`'s user-facing walkthrough — a plain description
+of the machinery underneath it, for the next person (or the next session) who
+has to change it.
