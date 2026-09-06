@@ -23,8 +23,18 @@ warnings.filterwarnings("ignore")
 logging.getLogger("google_genai").setLevel(logging.ERROR)
 logging.getLogger("google.genai").setLevel(logging.ERROR)
 
-HERE = pathlib.Path(__file__).resolve().parent.parent  # the halmos folder
-SPEND = pathlib.Path("spend.log")  # written where you run
+# The project folder: where script.txt/style_block.txt/settings.json are
+# looked for and frames/gen/work/out/plan.json/spend.log/corrections.txt are
+# written, unless --script/--style override them. Defaults to the directory
+# you ran the command from; 1_plan.py/2_make.py reassign it from --out/
+# --project before doing anything else, so nothing else in this module needs
+# to know whether a project flag was given.
+PROJECT_DIR = pathlib.Path.cwd()
+
+
+def spend_path():
+    return PROJECT_DIR / "spend.log"
+
 
 # The key lives outside this folder, in your own home directory, so that copying,
 # zipping, sharing or publishing the folder can never carry the key with it.
@@ -96,7 +106,12 @@ def client():
 
 # --------------------------------------------------------------- settings ----
 def settings():
-    f = HERE / "settings.json"
+    """Project-folder settings.json, falling back to a user-level default at
+    ~/.config/halmos/settings.json, falling back to built-in defaults - so a
+    house style and a spending limit can be set once rather than per video."""
+    f = PROJECT_DIR / "settings.json"
+    if not f.exists():
+        f = pathlib.Path.home() / ".config" / "halmos" / "settings.json"
     s = json.loads(f.read_text()) if f.exists() else {}
     s.setdefault("resolution", "1080p")
     s.setdefault("target_lufs", -14)
@@ -111,9 +126,11 @@ def settings():
     return s
 
 
-def style_block():
-    """The look of every shot, as the user wrote it. Comment lines are dropped."""
-    f = HERE / "style_block.txt"
+def style_block(path=None):
+    """The look of every shot, as the user wrote it. Comment lines are
+    dropped. Defaults to style_block.txt in the project folder; pass an
+    explicit `path` to use a style file shared across several projects."""
+    f = pathlib.Path(path) if path else (PROJECT_DIR / "style_block.txt")
     if not f.exists():
         sys.exit(f"Missing {f}. It holds the look of every shot - see STYLE.md.")
     body = [ln for ln in f.read_text().splitlines() if not ln.strip().startswith("#")]
@@ -131,14 +148,17 @@ def style_block():
 
 # ------------------------------------------------------------------ spend ----
 def log_spend(kind, detail, usd, note=""):
-    SPEND.open("a").write(f"{time.strftime('%F %T')}\t{kind}\t{detail}\t${usd:.4f}\t{note}\n")
+    spend_path().open("a").write(
+        f"{time.strftime('%F %T')}\t{kind}\t{detail}\t${usd:.4f}\t{note}\n"
+    )
 
 
 def spent_so_far():
-    if not SPEND.exists():
+    p = spend_path()
+    if not p.exists():
         return 0.0
     tot = 0.0
-    for line in SPEND.read_text().splitlines():
+    for line in p.read_text().splitlines():
         for part in line.split("\t"):
             if part.startswith("$"):
                 try:

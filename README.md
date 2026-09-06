@@ -226,6 +226,36 @@ check missed.
 
 ---
 
+# Making more than one video
+
+Everything above assumes one video per copy of this folder. If you make more
+than a couple, that gets old fast — so both commands take flags that let one
+copy of halmos handle any number of separate video projects, each in its own
+folder elsewhere on your computer:
+
+```
+python3 1_plan.py  --script ~/videos/bees/script.txt \
+                   --style  ~/videos/house-style.txt \
+                   --out    ~/videos/bees
+
+python3 2_make.py  --project ~/videos/bees
+```
+
+`--out` is the project folder — everything `1_plan.py` writes (pictures,
+`plan.json`, and so on) goes there instead of into this folder, and it is
+created for you if it doesn't exist yet. `2_make.py --project` points at that
+same folder to pick up where `1_plan.py` left off; it also finds the style
+`1_plan.py` used automatically, so you don't have to repeat `--style`.
+
+`--style` is worth pointing at a file outside any one project folder, like
+`~/videos/house-style.txt` above — that is how the same look stays consistent
+across every video without copying `style_block.txt` between projects.
+
+Leave all three flags off and both commands work exactly as in the walkthrough
+above, using this folder as the only project there is.
+
+---
+
 # If something goes wrong
 
 `TROUBLESHOOTING.md` has the common errors and what they mean. The two you are

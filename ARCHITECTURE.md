@@ -52,16 +52,24 @@ one place that knows *how* to ask, not *what* to ask.
 - **The key.** `api_key()` checks `GEMINI_API_KEY` then `~/.config/halmos/key`,
   deliberately never inside the project folder. `client()` builds the SDK
   client from it.
-- **Settings.** `settings()` reads `HERE/settings.json` (falling back to
-  built-in defaults for any missing key) and `style_block()` reads
-  `HERE/style_block.txt`, stripping `#` comment lines and rejecting the
-  placeholder text or anything under 60 characters. `HERE` is currently the
-  halmos installation folder, not a per-project directory — see TODO.md item 3.
+- **The project folder.** `gem.PROJECT_DIR` (default: the current directory)
+  is where `settings.json`/`style_block.txt` are looked for and everything
+  gets written. `1_plan.py`/`2_make.py` reassign it from `--out`/`--project`
+  before doing anything else; nothing downstream needs to know whether a
+  project flag was given.
+- **Settings.** `settings()` reads `PROJECT_DIR/settings.json`, falling back
+  to `~/.config/halmos/settings.json`, falling back to built-in defaults —
+  so a house style and spending limit can be set once rather than per video.
+  `style_block()` defaults to `PROJECT_DIR/style_block.txt` but accepts an
+  explicit `path=` to use a style file shared across several projects
+  (`--style` resolves to this); it strips `#` comment lines and rejects the
+  placeholder text or anything under 60 characters.
 - **Spend.** `log_spend(kind, detail, usd, note)` appends one tab-separated
-  line to `SPEND` (`spend.log`). `spent_so_far()` sums every `$`-prefixed
-  field across all lines, tolerating malformed ones. `check_budget()` compares
-  a prospective spend against `settings()["max_spend_usd"]` and exits before
-  spending if it would cross the ceiling.
+  line to `spend_path()` (`PROJECT_DIR/spend.log`). `spent_so_far()` sums
+  every `$`-prefixed field across all lines, tolerating malformed ones.
+  `check_budget()` compares a prospective spend against
+  `settings()["max_spend_usd"]` and exits before spending if it would cross
+  the ceiling.
 - **`ask(prompt, images=None, want_json=True, retries=3)`** is the one text/
   vision call in the whole pipeline. It sends `prompt` (plus any images as
   inline bytes) to `TEXT_MODEL`, strips a ` ```json ` fence if present, finds
@@ -180,30 +188,61 @@ to `lib/edit.py` currently has to reconstruct from usage:
 
 ```python
 {
-  "video": str, "width": int, "height": int, "fps": int,
-  "shots": [
-    {"beat": str, "text": str, "dur": float, "src": str,
-     "in": float, "reverse": bool}   # in/reverse from choose_inpoint()
-  ],
-  "sources": {"<src>": {"file": "path/to/clip.mp4"}},
-  "narration": {"file": "path/to/audio", "start": float} | absent,
-  "music": {"file": "path/to/audio.mp3", "gain_db": float} | absent,
-  "target_lufs": float,
-  "caption_font_family": str, "caption_font_file": str,
+    "video": str,
+    "width": int,
+    "height": int,
+    "fps": int,
+    "shots": [
+        {
+            "beat": str,
+            "text": str,
+            "dur": float,
+            "src": str,
+            "in": float,
+            "reverse": bool,
+        }  # in/reverse from choose_inpoint()
+    ],
+    "sources": {"<src>": {"file": "path/to/clip.mp4"}},
+    "narration": {"file": "path/to/audio", "start": float} | absent,
+    "music": {"file": "path/to/audio.mp3", "gain_db": float} | absent,
+    "target_lufs": float,
+    "caption_font_family": str,
+    "caption_font_file": str,
 }
 ```
 
 ## `1_plan.py` / `2_make.py` — the two commands
 
-Both are linear scripts, not modules meant to be imported — `main()` in each
-reads inputs, calls into `lib/`, and writes outputs, in the order shown in
-the diagram above. Read them top to bottom; there is no indirection to trace
-through beyond the `lib/` calls documented above.
+Both are linear scripts, not modules meant to be imported — `main(argv=None)`
+in each parses arguments (via `parse_args(argv)`, so tests can call `main()`
+directly without touching `sys.argv`), reads inputs, calls into `lib/`, and
+writes outputs, in the order shown in the diagram above. `main()` is the
+first thing that touches `gem.PROJECT_DIR` — it resolves `--out`/`--project`
+(default: the current directory) and assigns it before calling anything else,
+so every function downstream just uses `PROJECT_DIR` or an explicit path
+argument and never needs to know whether a project flag was given.
+
+`1_plan.py --script`/`--style` default to filenames inside `--out` (so a
+plain `python3 1_plan.py` behaves exactly as before); given explicitly, they
+can point anywhere — the mechanism for a style file shared across several
+projects. `1_plan.py` records the *resolved* style path into `plan.json` as
+`"style_source"`, so `2_make.py` picks up the same style automatically
+without repeating `--style` (it also accepts its own `--style`, which takes
+priority over the recorded one).
+
+Read the two scripts top to bottom; there is no indirection to trace through
+beyond the `lib/` calls documented above.
 
 ## Known structural gaps, for context
 
-- **Working-directory coupling.** Everything is relative-path-based, assuming
-  the current directory is the halmos checkout itself. See TODO.md item 3.
-- **`gem.SPEND`** is a bare `pathlib.Path("spend.log")`, resolved against
-  whatever the current directory happens to be at import time, not the
-  project folder — the concrete instance of the gap above that bit hardest.
+- **Clip generation and the edit have no CLI tests.** `tests/test_cli.py`'s
+  end-to-end test runs `1_plan.py` fully and `2_make.py` as far as recording
+  alignment against a real project folder, but stops before clip generation
+  — faking Veo's async operation-polling protocol (and the omni model's
+  separate `interactions` API) is a bigger undertaking than this pass
+  covered. `edit.build()`'s own path-parameter plumbing is exercised
+  directly by `tests/test_ffmpeg_chain.py` instead, just not from inside a
+  full `2_make.py` run.
+- **Not installable yet.** TODO.md item 3's "ideally `pip install halmos`"
+  is unaddressed — the two scripts are still run with `python3 1_plan.py`
+  from wherever the checkout lives, just no longer *from inside* it.

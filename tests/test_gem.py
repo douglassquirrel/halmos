@@ -1,8 +1,40 @@
+import pathlib
+
 import pytest
 
 from lib import gem
 
 pytestmark = pytest.mark.tier1
+
+
+def test_project_dir_defaults_to_the_current_directory():
+    # Not isolated on purpose - this pins down the real default.
+    assert gem.PROJECT_DIR == pathlib.Path.cwd()
+
+
+# --------------------------------------------------------------- settings ----
+def test_settings_uses_built_in_defaults_with_nothing_on_disk(isolated_home, isolated_user_config):
+    s = gem.settings()
+    assert s["max_spend_usd"] == 20.0
+    assert s["words_per_minute"] == 130
+
+
+def test_settings_prefers_the_project_folder_over_the_user_default(
+    isolated_home, isolated_user_config
+):
+    (isolated_home / "settings.json").write_text('{"max_spend_usd": 5.0}')
+    config_dir = isolated_user_config / ".config" / "halmos"
+    config_dir.mkdir(parents=True)
+    (config_dir / "settings.json").write_text('{"max_spend_usd": 99.0}')
+    assert gem.settings()["max_spend_usd"] == 5.0
+
+
+def test_settings_falls_back_to_the_user_level_default(isolated_home, isolated_user_config):
+    # No settings.json in the project folder at all.
+    config_dir = isolated_user_config / ".config" / "halmos"
+    config_dir.mkdir(parents=True)
+    (config_dir / "settings.json").write_text('{"max_spend_usd": 99.0}')
+    assert gem.settings()["max_spend_usd"] == 99.0
 
 
 # ------------------------------------------------------------- style_block ---
@@ -42,13 +74,26 @@ def test_style_block_rejects_content_under_sixty_chars(isolated_home):
         gem.style_block()
 
 
+def test_style_block_accepts_an_explicit_path_override(isolated_home, tmp_path):
+    # A shared style file can live outside the project folder entirely -
+    # TODO.md item 3's worked example passes --style pointing elsewhere.
+    shared = tmp_path / "elsewhere" / "house-style.txt"
+    shared.parent.mkdir()
+    shared.write_text("A shared look used by several different video projects at once.")
+    # isolated_home's PROJECT_DIR has no style_block.txt at all - proves the
+    # explicit path is used instead of the project-relative default.
+    assert gem.style_block(path=shared) == (
+        "A shared look used by several different video projects at once."
+    )
+
+
 # ----------------------------------------------------- spent_so_far / budget -
 def test_spent_so_far_with_no_log_is_zero(isolated_home):
     assert gem.spent_so_far() == 0.0
 
 
 def test_spent_so_far_sums_well_formed_entries(isolated_home):
-    gem.SPEND.write_text(
+    gem.spend_path().write_text(
         "2026-09-06 10:00:00\tstill\t1a\t$0.0336\tframes/1a.png\n"
         "2026-09-06 10:00:01\tthink\t100+50 tok\t$0.6000\t\n"
     )
@@ -56,7 +101,7 @@ def test_spent_so_far_sums_well_formed_entries(isolated_home):
 
 
 def test_spent_so_far_skips_a_malformed_dollar_field(isolated_home):
-    gem.SPEND.write_text(
+    gem.spend_path().write_text(
         "2026-09-06 10:00:00\tstill\t1a\t$0.0336\tframes/1a.png\n"
         "2026-09-06 10:00:01\tclip/lite\t2a\t$not-a-number\tgen/beat_2a.mp4\n"
         "2026-09-06 10:00:02\tmusic\t1 track\t$0.0800\taudio/music_bed.mp3\n"
@@ -69,7 +114,7 @@ def test_check_budget_within_the_cap_does_not_raise(isolated_home):
 
 
 def test_check_budget_over_the_cap_exits_with_the_totals(isolated_home):
-    gem.SPEND.write_text("2026-09-06 10:00:00\tstill\t1a\t$16.00\tframes/1a.png\n")
+    gem.spend_path().write_text("2026-09-06 10:00:00\tstill\t1a\t$16.00\tframes/1a.png\n")
     with pytest.raises(SystemExit) as exc_info:
         gem.check_budget(5.0, s={"max_spend_usd": 20.0})
     message = str(exc_info.value)

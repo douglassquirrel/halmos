@@ -13,13 +13,33 @@ if str(ROOT) not in sys.path:
 from lib import gem  # noqa: E402
 
 
+@pytest.fixture(autouse=True)
+def _restore_project_dir():
+    """1_plan.py/2_make.py's main() assigns gem.PROJECT_DIR directly (a real
+    module mutation, not a monkeypatch) since that's exactly what a real run
+    does at startup. Tests that invoke main() directly (tests/test_cli.py)
+    would otherwise leak that mutation into every test that runs afterwards
+    in the same process - restore the original value unconditionally."""
+    original = gem.PROJECT_DIR
+    yield
+    gem.PROJECT_DIR = original
+
+
 @pytest.fixture
 def isolated_home(tmp_path, monkeypatch):
-    """Point gem.HERE/gem.SPEND at a scratch dir instead of the real checkout,
+    """Point gem.PROJECT_DIR at a scratch dir instead of the real checkout,
     so style_block()/settings()/spent_so_far() never see this repo's own
     style_block.txt, settings.json or spend.log."""
-    monkeypatch.setattr(gem, "HERE", tmp_path)
-    monkeypatch.setattr(gem, "SPEND", tmp_path / "spend.log")
+    monkeypatch.setattr(gem, "PROJECT_DIR", tmp_path)
+    return tmp_path
+
+
+@pytest.fixture
+def isolated_user_config(tmp_path, monkeypatch):
+    """Point pathlib.Path.home() at a scratch dir, for testing settings()'s
+    fallback to ~/.config/halmos/settings.json without touching the real
+    user's home directory."""
+    monkeypatch.setattr(pathlib.Path, "home", lambda: tmp_path)
     return tmp_path
 
 
@@ -321,3 +341,15 @@ class FakeClient:
     def __init__(self, responses):
         self.models = FakeModels(responses)
         self.files = FakeFiles()
+
+
+def load_script(name):
+    """1_plan.py / 2_make.py can't be `import`ed by that name (identifiers
+    can't start with a digit), so load them directly from their file path."""
+    import importlib.util
+
+    path = ROOT / name
+    spec = importlib.util.spec_from_file_location(name.replace(".py", ""), path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod

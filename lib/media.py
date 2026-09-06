@@ -79,15 +79,16 @@ def make_still(beat, prompt, style, outdir="frames", force=False):
     return dst
 
 
-def contact_sheet(beats, outdir="frames", dst="contact_sheet.png", cols=4):
+def contact_sheet(beats, outdir="frames", dst="contact_sheet.png", cols=4, work="work"):
     """One picture of all the shots, with the beat name burned on each."""
     paths = [f"{outdir}/{b}.png" for b in beats if os.path.exists(f"{outdir}/{b}.png")]
     if not paths:
         return None
     # tile() works across FRAMES of one stream, not across several inputs, so the
     # labelled stills are written as a numbered sequence and read back as one.
-    os.makedirs("work/sheet", exist_ok=True)
-    for f in glob.glob("work/sheet/*.png"):
+    sheet_dir = f"{work}/sheet"
+    os.makedirs(sheet_dir, exist_ok=True)
+    for f in glob.glob(f"{sheet_dir}/*.png"):
         os.remove(f)
     present = [b for b in beats if os.path.exists(f"{outdir}/{b}.png")]
     for i, b in enumerate(present):
@@ -103,7 +104,7 @@ def contact_sheet(beats, outdir="frames", dst="contact_sheet.png", cols=4):
                 f"scale=360:-1,pad=iw+8:ih+8:4:4:color=white,"
                 f"drawtext=text='{b}':x=16:y=16:fontsize=34:fontcolor=white:"
                 f"box=1:boxcolor=black@0.75:boxborderw=10",
-                f"work/sheet/{i:03d}.png",
+                f"{sheet_dir}/{i:03d}.png",
             ],
             "labelling stills",
         )
@@ -117,7 +118,7 @@ def contact_sheet(beats, outdir="frames", dst="contact_sheet.png", cols=4):
             "-f",
             "image2",
             "-i",
-            "work/sheet/%03d.png",
+            f"{sheet_dir}/%03d.png",
             "-vf",
             f"tile={cols}x{rows}:color=white",
             "-frames:v",
@@ -201,7 +202,8 @@ def find_retakes(words, min_words=5):
     return cuts
 
 
-def cut_audio(src, cuts, dst):
+def cut_audio(src, cuts, dst, work="work"):
+    os.makedirs(work, exist_ok=True)
     keep, pos = [], 0.0
     for c in cuts:
         if c["start"] > pos:
@@ -210,14 +212,15 @@ def cut_audio(src, cuts, dst):
     keep.append((pos, None))
     parts = []
     for k, (s, e) in enumerate(keep):
-        f = f"work/_seg{k}.m4a"
+        f = f"{work}/_seg{k}.m4a"
         args = ["ffmpeg", "-v", "error", "-y", "-ss", f"{s:.3f}"]
         if e is not None:
             args += ["-to", f"{e:.3f}"]
         args += ["-i", src, "-c", "copy", f]
         run(args, "trimming retakes")
         parts.append(f)
-    with open("work/_seglist.txt", "w") as fh:
+    seglist = f"{work}/_seglist.txt"
+    with open(seglist, "w") as fh:
         for p in parts:
             fh.write(f"file '{os.path.basename(p)}'\n")
     run(
@@ -231,7 +234,7 @@ def cut_audio(src, cuts, dst):
             "-safe",
             "0",
             "-i",
-            "work/_seglist.txt",
+            seglist,
             "-c",
             "copy",
             dst,
