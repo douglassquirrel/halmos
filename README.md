@@ -330,8 +330,8 @@ watch the result. Please read it once.
 
 ## Contributing
 
-Issues and pull requests are welcome. Two things worth knowing before you open
-one:
+Issues and pull requests are welcome. Three things worth knowing before you
+open one:
 
 - **Run it before you change it.** Almost every bug in this project's history was
   invisible in the code and obvious the first time someone ran the thing — a
@@ -341,5 +341,8 @@ one:
 - **Never commit a key.** halmos reads yours from `~/.config/halmos/key` or the
   `GEMINI_API_KEY` environment variable, and there is deliberately nowhere inside
   the folder to put one. Please keep it that way.
+- **Running the test suite.** `pip install -r requirements-dev.txt`, then
+  `pytest --cov=lib --cov-report=term-missing` and `ruff check .` — see
+  `TODO.md` for what's covered. CI runs both on every push.
 
 `TODO.md` lists what is known to be missing.
