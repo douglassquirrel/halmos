@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# halmos - MIT licence, see LICENSE
 """
 The mechanical half: pictures, clips, audio, and the finished file.
 

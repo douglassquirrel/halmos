@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-STEP TWO. Turn your recording and the pictures into a finished video.
+halmos, step two: turn your recording and the pictures into a finished video.
 
   python3 2_make.py
 

@@ -5,7 +5,7 @@ They are not style preferences.
 
 ## 1. Check your facts before you write the script
 
-Nothing in this folder checks them. The pipeline will illustrate a false statement
+Nothing in halmos checks them. The pipeline will illustrate a false statement
 as happily as a true one, and produce a confident, well-made video repeating it.
 
 Verify names, dates, numbers and who-did-what against a primary source — the

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# halmos - MIT licence, see LICENSE
 """
 The edit: choosing which seconds of each clip to keep, and building the file.
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-STEP ONE. Turn your script into pictures to look at, and a script to read aloud.
+halmos, step one: turn your script into pictures to look at, and words to read aloud.
 
   python3 1_plan.py
 

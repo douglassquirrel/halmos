@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# halmos - MIT licence, see LICENSE
 """
 The judgement half: turning a script into beats, and beats into shot prompts.
 

@@ -1,7 +1,9 @@
-# Make a short video from a piece of writing
+# halmos
 
-You give this folder a paragraph of text and a recording of your own voice. It
-gives you back a finished vertical video — about a minute long, with pictures,
+**Your words and your voice in; a finished video out.**
+
+Give halmos a paragraph of text and a recording of yourself reading it. It gives
+you back a finished vertical video — about a minute long, with pictures,
 captions, and music — ready to post.
 
 **You run two commands.** In between, you look at some pictures and record
@@ -11,7 +13,24 @@ It costs **about £7 a video** and takes **about 45 minutes of your time**, spre
 over an hour or two of the computer working on its own.
 
 Everything is done by Google's Gemini models. You need one API key from Google
-and nothing else. **You never need to open a chatbot.**
+and nothing else. **You never need to open a chatbot**, and no part of this asks
+you to write a prompt.
+
+This README is written for someone who has never used a terminal before. If that
+is not you, the whole of it is: put a key in `~/.config/halmos/key`, put your
+words in `script.txt`, describe your look in `style_block.txt` (or copy one out
+of `styles/`), then `python3 1_plan.py`, record the narration it asks for, and
+`python3 2_make.py`.
+
+## Getting it
+
+```
+git clone https://github.com/YOURNAME/halmos.git
+cd halmos
+```
+
+Or download the ZIP from the GitHub page and unzip it. Everything you need is in
+the folder; there is nothing to install except the two things below.
 
 ---
 
@@ -209,11 +228,12 @@ done.
 
 ---
 
-# What is in this folder
+# What is in halmos
 
 | | |
 |---|---|
 | `README.md` | This file. |
+| `LICENSE` | MIT. Do what you like with it. |
 | `STYLE.md` | How to describe your look, and what to forbid. Read before editing `style_block.txt`. |
 | `RULES.md` | Honesty rules. Short, and they matter if the video is for a business. |
 | `TROUBLESHOOTING.md` | Errors and what to do about them. |
@@ -243,3 +263,37 @@ Measured on a real video made this way:
 
 `settings.json` has a spending limit — £16 by default — and both commands stop
 before crossing it rather than after.
+
+---
+
+# About this project
+
+**halmos is MIT-licensed** — see `LICENSE`. Use it, change it, sell what you make
+with it. There is no warranty; the money it spends is spent on your Google
+account, so read "What it costs" above and set `max_spend_usd` in
+`settings.json` to a number you would not mind losing.
+
+**It is not affiliated with Google or Anthropic.** It is a set of scripts that
+call the public Gemini API, and the model names in `lib/media.py` are the ones
+that worked when it was written. Google renames and retires models; if a model
+name stops working, that file is the one place to change it.
+
+**Everything it generates is AI-generated**, and Google marks it as such with an
+invisible watermark. `RULES.md` is short and is about what you owe the people who
+watch the result. Please read it once.
+
+## Contributing
+
+Issues and pull requests are welcome. Two things worth knowing before you open
+one:
+
+- **Run it before you change it.** Almost every bug in this project's history was
+  invisible in the code and obvious the first time someone ran the thing — a
+  contact sheet that quietly showed one picture instead of twelve, a judgement
+  step that silently fell back to a default for every shot, audio three seconds
+  longer than the video. Reading was not enough in any of those cases.
+- **Never commit a key.** halmos reads yours from `~/.config/halmos/key` or the
+  `GEMINI_API_KEY` environment variable, and there is deliberately nowhere inside
+  the folder to put one. Please keep it that way.
+
+`TODO.md` lists what is known to be missing.

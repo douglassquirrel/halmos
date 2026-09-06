@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# halmos - MIT licence, see LICENSE
 """
 Shared plumbing: the API key, the model calls, and the spend log.
 
