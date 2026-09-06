@@ -30,3 +30,10 @@ narration_script.txt
 __pycache__/
 *.pyc
 .DS_Store
+
+# Dev tooling (contributors only - see README's Contributing section).
+.venv/
+.pytest_cache/
+.coverage
+htmlcov/
+.ruff_cache/

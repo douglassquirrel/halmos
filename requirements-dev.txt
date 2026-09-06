@@ -1,0 +1,13 @@
+# Dev/test tooling only - NOT needed by an end user making videos.
+# See README.md's "Getting it" section: the only runtime dependency is
+# google-genai itself, installed with plain `pip install google-genai`.
+#
+#   python3 -m venv .venv && source .venv/bin/activate
+#   pip install -r requirements-dev.txt
+#   pytest --cov=lib --cov-report=term-missing
+#   ruff check .
+
+google-genai>=2.22.0
+pytest>=9.1
+pytest-cov>=7.1
+ruff>=0.16
