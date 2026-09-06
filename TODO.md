@@ -27,9 +27,9 @@ check/format both run clean.
   default (unlike Homebrew's slimmed `ffmpeg` formula, which needs
   `ffmpeg-full` — see the "Before you start" section of `README.md`), so a
   plain `apt-get install ffmpeg` was used rather than anything special —
-  first real run on an actual runner will confirm whether that assumption
-  holds; if it doesn't, the skip-guards mean Tier 2 skips cleanly rather
-  than failing.
+  confirmed on the first real run (green, 57s): the assumption holds. If a
+  future runner image ever lacks them, the skip-guards mean Tier 2 skips
+  cleanly rather than failing.
 - The original four historical bugs, the three test tiers, and the lint pass
   are all done — see `SPEC.md`/`CLAUDE.md`/`DIARY.md` in the parent
   `halmos-code/` folder (not part of this repo) for the full account of how
