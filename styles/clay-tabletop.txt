@@ -1,0 +1,40 @@
+# READY-MADE LOOK: CLAY MODELS ON A TABLETOP
+#
+# Tactile and slightly funny. Objects have weight and cast real shadows, so
+# movement reads clearly — the best of these three for showing a process.
+#
+# To use it:  copy this file over style_block.txt, then change the palette and
+#             the surface if you want a different set.
+# ---------------------------------------------------------------------------
+
+Handmade plasticine models photographed on a plain warm-grey tabletop, in the
+manner of stop-motion animation. Every surface shows thumbprints, tool marks and
+tiny lint: it is obviously modelled by hand and is not trying to hide it. Slight
+imperfections in the shapes are wanted.
+
+The palette is four clay colours and all four appear in every shot: mustard
+yellow, teal, brick red, and bone white, on the warm-grey table.
+
+One soft key light from high on the left and a weaker fill from the right, so
+everything casts a definite soft shadow onto the table. Shallow depth of field:
+the model is sharp and the far edge of the table falls gently out of focus.
+Camera slightly above eye level looking down, static.
+
+Composed for a tall vertical frame: the subject is close and large, filling the
+frame from top to bottom, with only a narrow margin around it.
+
+One single continuous image filling the whole frame: not a grid of panels, not a
+comic strip, not a storyboard, no dividing lines, no repeated copies of the
+subject, no before-and-after side by side.
+
+Nothing enters or leaves the frame and nobody is present: no armature, no rig,
+no studio equipment, no set walls, no other objects on the table.
+
+No text of any kind: no words, no letters, no numbers, no labels, no captions,
+no signs, no writing on anything, and no markings on dials, faces or instruments
+even where an object would normally carry them.
+
+No photographic human hands, arms or bodies at any point. The models move by
+themselves.
+
+No dialogue, no music, no on-screen text.

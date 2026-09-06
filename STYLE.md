@@ -55,6 +55,28 @@ The prohibitions already at the bottom of `style_block.txt` are those five.
 **Keep them unless you have a specific reason not to.** If your style genuinely
 wants hands, delete that line — but delete it deliberately.
 
+### Two ways a prohibition fails
+
+Prohibitions are reliable, but not magic, and both of these were found by
+running the three example looks rather than by reasoning about them.
+
+**It fails if your own description asks for the thing.** The watercolour example
+originally said "the paper grain and its soft deckled texture clearly visible"
+at the top and "no deckled or torn paper edge" at the bottom. The model obeyed
+the description and drew a sheet of paper with ragged edges sitting on a
+background — a picture of a painting rather than a painting. Deleting the word
+"deckled" from the *description* fixed in one go what the prohibition could not.
+**When a shot keeps coming back wrong, read your own positive lines first.** A
+prohibition cannot win an argument with them.
+
+**It weakens when the subject itself implies the thing.** A weather vane
+implies compass letters. Told five separate times to draw no letters, the model
+went from four letters to two, and would not go to none. Nothing about the style
+was wrong; the object was pulling harder than the sentence. This is exactly what
+the automatic frame check and rule 5 in `RULES.md` — a person watches the whole
+video before it goes out — are there to catch. If it happens to you, the cheap
+fix is to change the *object* in that one shot, not to add a sixth prohibition.
+
 ## Show, do not describe, when you can
 
 Words are obeyed by some models and quietly ignored by others. **A picture is
@@ -73,6 +95,29 @@ It means two things for you:
 - **Changing your look is cheap.** Edit `style_block.txt` and run `1_plan.py`
   again — new pictures cost about 40p. Do that as many times as you like before
   you record anything.
+
+## Three looks you can just take
+
+Writing one of these from scratch is the hardest part of setting halmos up, and
+you have nothing to look at while you do it. So there are three finished ones in
+the **`styles`** folder. Each is complete and works as it stands:
+
+| File | What it looks like | Best at |
+|---|---|---|
+| `styles/flat-vector.txt` | Solid shapes of flat colour, no outlines, long soft shadows | Clean and modern; reads well small, on a phone. Pick this if unsure |
+| `styles/ink-and-watercolour.txt` | Dip-pen line and transparent washes on cream cartridge paper | Warm and personal rather than corporate; forgiving of imperfection |
+| `styles/clay-tabletop.txt` | Plasticine models on a grey table, real shadows, thumbprints visible | Showing a *process* — things with weight move legibly |
+
+To use one, copy it over `style_block.txt`:
+
+```
+cp styles/flat-vector.txt style_block.txt
+```
+
+Then change the palette line to your own colours and leave everything else
+alone. Every one of them names exactly four colours and says all four must
+appear in every shot — that line is doing more work than it looks like, and it
+is the first thing to edit and the last thing to delete.
 
 ## Keep it consistent between videos
 

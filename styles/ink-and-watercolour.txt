@@ -1,0 +1,44 @@
+# READY-MADE LOOK: INK AND WATERCOLOUR
+#
+# Warm, handmade, unhurried. Good for anything that wants to feel personal
+# rather than institutional. Forgiving of imperfection, which suits it.
+#
+# To use it:  copy this file over style_block.txt, then change the palette line
+#             if you want a different set of washes.
+# ---------------------------------------------------------------------------
+
+Hand-drawn illustration on heavy cream cartridge paper, the tooth and grain of
+the paper showing faintly through every wash. Confident dip-pen ink
+line, slightly uneven in weight, with watercolour washes laid inside and
+sometimes just outside it, leaving darker wet edges where each wash dried.
+
+The palette is four washes and all four appear in every shot: dusty sage green,
+burnt sienna, muted indigo, and raw ochre, over the cream of the paper. The
+washes are transparent: where two overlap you can see both.
+
+Lit as though by soft daylight from a window to the left, flat and even, no
+strong shadows. Camera looking straight down at the page, static, as if the
+drawing were lying on a table.
+
+Composed for a tall vertical frame: the subject is close and large, filling the
+frame from top to bottom, with only a narrow margin around it.
+
+One single continuous image filling the whole frame: not a grid of panels, not a
+comic strip, not a storyboard, no dividing lines, no repeated copies of the
+subject, no before-and-after side by side.
+
+The drawing bleeds off all four edges of the frame. We are not looking at a sheet
+of paper lying on a surface, we are inside the drawing: no border, no margin, no
+mount, no deckled or torn edge, no visible edge of the paper anywhere, no frame,
+no drop shadow behind a sheet, no second background behind the picture. No sketchbook spiral, no tape, no pins, no drawing board, no
+paintbrush or pen visible: only the picture itself.
+
+No text of any kind: no words, no letters, no numbers, no labels, no captions,
+no signs, no handwriting, no writing on anything. This holds even where an object
+would normally carry markings: no compass points, no dial faces, no gauge
+numerals, no scale marks, no clock numbers. Leave those surfaces blank.
+
+No photographic human hands, arms or bodies at any point. Objects move by
+themselves.
+
+No dialogue, no music, no on-screen text.

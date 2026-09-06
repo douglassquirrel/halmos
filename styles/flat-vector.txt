@@ -1,0 +1,40 @@
+# READY-MADE LOOK: FLAT VECTOR
+#
+# Clean, modern, corporate-friendly. Reads well small, on a phone, muted.
+# The one to pick if you are not sure.
+#
+# To use it:  copy this file over style_block.txt, then change the four colours
+#             on the palette line to your own brand colours and nothing else.
+# ---------------------------------------------------------------------------
+
+Flat vector illustration with no outlines: solid shapes of flat colour, gently
+rounded corners, no gradients except a single soft one in the background, and
+long soft-edged shadows falling to the lower right as though from one light high
+on the left.
+
+The palette is exactly four colours and all four appear in every shot: deep navy
+blue, warm coral, pale sand, and off-white. Nothing else. Navy for the darkest
+shapes, coral for the one thing the eye should go to first.
+
+Camera straight on at eye level, static, no perspective and no depth of field:
+everything is equally sharp. Generous empty space around the subject.
+
+Composed for a tall vertical frame: the subject is close and large, filling the
+frame from top to bottom, with only a narrow margin around it.
+
+One single continuous image filling the whole frame: not a grid of panels, not a
+comic strip, not a storyboard, no dividing lines, no repeated copies of the
+subject, no before-and-after side by side.
+
+No outlines, no black keylines, no stroke around any shape, no cross-hatching,
+no visible brush or pencil texture. The surfaces are perfectly flat.
+
+No text of any kind: no words, no letters, no numbers, no labels, no captions,
+no signs, no writing on anything. This holds even where an object would normally
+carry markings: no compass points, no dial faces, no gauge numerals, no scale
+marks, no keyboard letters, no clock numbers. Leave those surfaces blank.
+
+No photographic human hands, arms or bodies at any point. Objects move by
+themselves.
+
+No dialogue, no music, no on-screen text.

@@ -4,6 +4,14 @@
 # shot, so every picture in your video looks like it belongs with the others.
 # Replace it with whatever look you want. Lines starting with # are ignored.
 #
+# IN A HURRY, OR NOT SURE WHAT TO WRITE? Do not start from this blank page.
+# The `styles` folder has three complete, working looks. Copy one over this file
+# and change the colours:
+#
+#     cp styles/flat-vector.txt style_block.txt
+#
+# (or, in Finder or Explorer, copy the file in and rename it style_block.txt).
+#
 # Read STYLE.md before editing — it explains what works and, more importantly,
 # what to forbid. The last few lines here are prohibitions; keep them unless you
 # have a reason not to. They exist because without them the models add things

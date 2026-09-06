@@ -80,8 +80,19 @@ Open **`style_block.txt`** and describe how you want your videos to look. This
 text is sent with every single picture, which is what makes them all look like
 they belong together.
 
-**Read `STYLE.md` before you write it.** It is short, and it explains the one
-thing that surprises everybody: what you *forbid* matters more than what you
+**Do not start from the blank page.** The `styles` folder has three complete,
+working looks — flat vector, ink and watercolour, and clay models on a tabletop.
+Copy whichever is closest over `style_block.txt`:
+
+```
+cp styles/flat-vector.txt style_block.txt
+```
+
+and then change the four colours it names to yours. That is a perfectly good way
+to finish this step in a minute.
+
+**Read `STYLE.md` before you write your own.** It is short, and it explains the
+one thing that surprises everybody: what you *forbid* matters more than what you
 describe. Leave the prohibitions at the bottom of the file alone unless you have
 a reason to change them.
 
@@ -207,6 +218,7 @@ done.
 | `RULES.md` | Honesty rules. Short, and they matter if the video is for a business. |
 | `TROUBLESHOOTING.md` | Errors and what to do about them. |
 | `style_block.txt` | **Your look.** You edit this. |
+| `styles/` | Three finished looks. Copy one over `style_block.txt` rather than starting from nothing. |
 | `script.txt` | **Your words.** You edit this. |
 | `settings.json` | Name, music mood, spending limit. |
 | `corrections.txt` | Written for you by step 1; you edit it if a picture is wrong. |
