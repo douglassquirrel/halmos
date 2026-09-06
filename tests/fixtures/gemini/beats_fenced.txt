@@ -1,0 +1,7 @@
+Sure, here's the beat split you asked for:
+
+```json
+{"beats": [{"beat": "1", "text": "Hello, world!"}, {"beat": "2", "text": "This is a test."}]}
+```
+
+Let me know if you'd like any changes.

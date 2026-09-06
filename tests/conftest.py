@@ -201,3 +201,100 @@ def stream_info(path):
             except (TypeError, ValueError):
                 s["duration"] = None
     return streams
+
+
+FIXTURES = pathlib.Path(__file__).resolve().parent / "fixtures" / "gemini"
+
+
+def fixture_text(name):
+    return (FIXTURES / name).read_text()
+
+
+class FakeUsage:
+    def __init__(self, prompt_tokens=10, candidate_tokens=5):
+        self.prompt_token_count = prompt_tokens
+        self.candidates_token_count = candidate_tokens
+
+
+class FakeTextResponse:
+    """Stands in for a google.genai generate_content() text/JSON response."""
+
+    def __init__(self, text):
+        self.text = text
+        self.usage_metadata = FakeUsage()
+
+
+class FakePart:
+    def __init__(self, inline_data=None):
+        self.inline_data = inline_data
+
+
+class FakeInlineData:
+    def __init__(self, data):
+        self.data = data
+
+
+class FakeContent:
+    def __init__(self, parts):
+        self.parts = parts
+
+
+class FakeCandidate:
+    def __init__(self, parts=(), audio_transcription=None):
+        self.content = FakeContent(list(parts))
+        if audio_transcription is not None:
+            self.content.audio_transcription = audio_transcription
+
+
+class FakeImageResponse:
+    """Stands in for a make_still() generate_content() response."""
+
+    def __init__(self, image_bytes=None):
+        parts = [FakePart(inline_data=FakeInlineData(image_bytes))] if image_bytes else []
+        self.candidates = [FakeCandidate(parts=parts)]
+
+
+class FakeAudioTranscription:
+    def __init__(self, payload):
+        self._payload = payload
+
+    def model_dump(self):
+        return self._payload
+
+
+class FakeTranscribeResponse:
+    """Stands in for a transcribe() generate_content() response."""
+
+    def __init__(self, payload):
+        part = FakePart()
+        part.audio_transcription = FakeAudioTranscription(payload)
+        self.candidates = [type("C", (), {"content": FakeContent([part])})()]
+        self.usage_metadata = FakeUsage()
+
+
+class FakeFiles:
+    def upload(self, file):
+        return f"uploaded:{file}"
+
+
+class FakeModels:
+    """responses: a list of return values / Exception instances, consumed
+    one per call - or a single value to return every time."""
+
+    def __init__(self, responses):
+        self._queue = list(responses) if isinstance(responses, list) else None
+        self._single = responses if self._queue is None else None
+        self.calls = 0
+
+    def generate_content(self, **kwargs):
+        self.calls += 1
+        item = self._queue.pop(0) if self._queue is not None else self._single
+        if isinstance(item, Exception):
+            raise item
+        return item
+
+
+class FakeClient:
+    def __init__(self, responses):
+        self.models = FakeModels(responses)
+        self.files = FakeFiles()

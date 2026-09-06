@@ -1,0 +1,8 @@
+{
+  "text": "hello there world",
+  "words": [
+    {"word": "hello", "start_offset": "0.100s", "end_offset": "0.400s"},
+    {"word": "there", "start_offset": "0.450s", "end_offset": "0.700s"},
+    {"word": "world", "start_offset": "0.750s", "end_offset": "1.100s"}
+  ]
+}
