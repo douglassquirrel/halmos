@@ -10,7 +10,7 @@ between something that works and something that can be relied on.
 
 ## 1. Tests and lint checks — done
 
-**There is now a real test suite** (`tests/`, 117 tests) and `ruff`
+**There is now a real test suite** (`tests/`, 145 tests) and `ruff`
 check/format both run clean.
 
 - **CI is now wired up** (`.github/workflows/tests.yml`): every push and PR
