@@ -49,24 +49,39 @@ ffmpeg -version
 If either says "command not found":
 
 - **Python** — download from python.org and install it.
-- **ffmpeg** — on a Mac, install Homebrew from brew.sh, then run
-  `brew install ffmpeg-full`. (Plain `brew install ffmpeg` is missing the
-  caption-rendering library halmos needs, and `2_make.py` will fail at the
-  very last step after generating everything else — `ffmpeg-full` has
-  everything.) On Windows, download from ffmpeg.org. On Linux,
-  `sudo apt install ffmpeg`.
+- **ffmpeg** — on a Mac, install Homebrew from brew.sh, then run:
 
-**`ffmpeg -version` succeeding is not enough** — it only proves ffmpeg is
-installed, not that it has the two libraries halmos needs. Check for those
-directly:
+  ```
+  brew install ffmpeg-full
+  echo 'export PATH="/opt/homebrew/opt/ffmpeg-full/bin:$PATH"' >> ~/.zshrc
+  ```
+
+  Both lines matter. Plain `brew install ffmpeg` is missing the
+  caption-rendering library halmos needs, so `ffmpeg-full` is required —
+  but `ffmpeg-full` is a Homebrew "keg-only" formula, meaning `brew
+  install` alone does **not** put it on your PATH (it deliberately avoids
+  clashing with the plain `ffmpeg` formula's own files). Skip the second
+  line and whichever `ffmpeg` was already on your PATH keeps running
+  instead — if that's the plain formula, or an older, now-mismatched
+  install, `2_make.py` fails at the very last step after generating
+  everything else, or `ffmpeg` may not run at all. **Open a new terminal
+  window** after adding that line — it only takes effect in new windows.
+  On Windows, download from ffmpeg.org. On Linux, `sudo apt install
+  ffmpeg`.
+
+**`ffmpeg -version` succeeding is not enough** — it only proves *some*
+ffmpeg runs, not that it's the right one with the two libraries halmos
+needs. Check for those directly:
 
 ```
 ffmpeg -filters | grep -E "ass|drawtext"
 ```
 
 You should see two lines back, one mentioning "libass" and one mentioning
-"libfreetype". If you see only one, or none, you have the plain formula —
-install `ffmpeg-full` as above (or your system's equivalent full build).
+"libfreetype". If you see only one, or none — or an error instead, such as
+`Library not loaded: .../libx265...dylib` — you're not yet running
+`ffmpeg-full`. Make sure both lines above were run, in order, in a
+**new** terminal window.
 
 Then install the one add-on this uses:
 

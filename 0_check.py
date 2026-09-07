@@ -29,17 +29,36 @@ from lib import gem, media  # noqa: E402
 def main():
     problems = []
 
-    if which("ffmpeg") and which("ffprobe"):
-        print("OK       ffmpeg and ffprobe are installed")
+    ffmpeg_ok, ffmpeg_detail = media.ffmpeg_diagnostic()
+    if which("ffmpeg") and which("ffprobe") and ffmpeg_ok:
+        print("OK       ffmpeg and ffprobe are installed and run correctly")
+    elif which("ffmpeg") and not ffmpeg_ok:
+        # A binary on PATH that crashes is a different, more confusing
+        # problem than a missing one - found live, 2026-09-07: ffmpeg-full
+        # is keg-only (Homebrew deliberately doesn't put it on PATH, since
+        # it conflicts with plain ffmpeg's binaries), so installing it is
+        # not enough on its own without the PATH export its own install
+        # caveats print. Naming the real crash (not a generic guess) is
+        # what actually let that get diagnosed and fixed.
+        problems.append(
+            f"ffmpeg is on your PATH but crashes when run: {ffmpeg_detail}\n"
+            "         This usually means ffmpeg-full is installed but not on your\n"
+            "         PATH yet (it's a Homebrew 'keg-only' formula, so brew install\n"
+            "         alone doesn't put it there) - add it with:\n"
+            "             echo 'export PATH=\"/opt/homebrew/opt/ffmpeg-full/bin:$PATH\"' "
+            ">> ~/.zshrc\n"
+            "         then open a new terminal window and run this check again."
+        )
+        print("BROKEN   ffmpeg is on your PATH but does not run")
     else:
         problems.append("ffmpeg is not installed - see README.md, 'Before you start'.")
         print("MISSING  ffmpeg and/or ffprobe")
 
-    # The two library checks below need ffmpeg itself to run at all -
-    # has_ffmpeg_filter() already returns False safely without it, but a
-    # MISSING line naming the wrong cause would be confusing, so skip
-    # straight past them when ffmpeg isn't there to blame instead.
-    if which("ffmpeg"):
+    # The two library checks below need ffmpeg to actually run, not just be
+    # present - has_ffmpeg_filter() already returns False safely either
+    # way, but a MISSING line naming the wrong cause would be confusing, so
+    # skip straight past them unless ffmpeg_ok is true.
+    if ffmpeg_ok:
         if media.has_ffmpeg_filter("ass"):
             print("OK       ffmpeg has the caption-rendering library (libass)")
         else:

@@ -16,6 +16,7 @@ import subprocess
 import sys
 import time
 import urllib.request
+from shutil import which
 
 from . import gem
 
@@ -48,10 +49,34 @@ def probe(path, entries="format=duration"):
 
 
 def need_ffmpeg():
-    from shutil import which
-
     if not which("ffmpeg") or not which("ffprobe"):
         sys.exit("ffmpeg is not installed. See README.md, 'Before you start'.")
+
+
+def ffmpeg_diagnostic():
+    """Whether ffmpeg actually runs, not just whether a binary is on PATH.
+
+    `which ffmpeg` finding a binary is not proof it works: a Homebrew
+    shared-library mismatch can leave a binary `which` finds but that
+    crashes with a dyld "Library not loaded" error on every invocation.
+    Found live, 2026-09-07 - `ffmpeg-full` is a *keg-only* Homebrew formula
+    (deliberately not auto-linked into PATH, since it conflicts with the
+    plain `ffmpeg` formula's binaries), so installing it is not enough on
+    its own; the fix is the PATH export `brew install ffmpeg-full` itself
+    prints as a caveat (see README.md's "Before you start") - `brew
+    unlink`/`link`/`reinstall` gymnastics did NOT fix the real case this
+    was found against, only that PATH export did.
+
+    Returns (ok, detail): detail is the crash's own last stderr line when
+    ok is False, so a real error is shown instead of a generic guess.
+    """
+    if not which("ffmpeg"):
+        return False, "ffmpeg is not on your PATH"
+    p = subprocess.run(["ffmpeg", "-version"], capture_output=True, text=True)
+    if p.returncode != 0:
+        lines = [ln for ln in (p.stderr or p.stdout or "").splitlines() if ln.strip()]
+        return False, (lines[-1].strip() if lines else "ffmpeg failed to run")
+    return True, ""
 
 
 def has_ffmpeg_filter(name):
@@ -62,10 +87,10 @@ def has_ffmpeg_filter(name):
     (or `which ffmpeg`) succeeding is not proof `edit.build()`'s caption
     burn-in (needs "ass"/libass) or `contact_sheet()`'s labelling (needs
     "drawtext") will actually work. Homebrew's plain `ffmpeg` formula lacks
-    both; `ffmpeg-full` has both - see README.md's "Before you start".
+    both; `ffmpeg-full` has both - see README.md's "Before you start". Also
+    returns False (rather than raising) if ffmpeg is on PATH but crashes -
+    see `ffmpeg_diagnostic()` for telling that case apart from this one.
     """
-    from shutil import which
-
     if not which("ffmpeg"):
         return False
     out = subprocess.run(["ffmpeg", "-filters"], capture_output=True, text=True).stdout

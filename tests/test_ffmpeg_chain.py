@@ -18,6 +18,39 @@ def test_has_ffmpeg_filter_is_false_for_a_made_up_name():
     assert media.has_ffmpeg_filter("not_a_real_filter_xyz") is False
 
 
+# -------------------------------------------------------- ffmpeg_diagnostic --
+# Found live, 2026-09-07: `which ffmpeg` finding a binary is not proof it
+# actually runs - a Homebrew shared-library mismatch (e.g. after installing
+# ffmpeg-full alongside an existing plain ffmpeg) can leave a binary that
+# `which` finds but that crashes with a dyld "Library not loaded" error on
+# every invocation, has_ffmpeg_filter() included (its ffmpeg -filters call
+# would just come back empty, silently misreported as "missing libass").
+def test_ffmpeg_diagnostic_ok_when_ffmpeg_runs():
+    ok, detail = media.ffmpeg_diagnostic()
+    assert ok is True
+    assert detail == ""
+
+
+def test_ffmpeg_diagnostic_reports_missing_ffmpeg(monkeypatch):
+    monkeypatch.setattr(media, "which", lambda name: None)
+    ok, detail = media.ffmpeg_diagnostic()
+    assert ok is False
+    assert "not" in detail.lower()
+
+
+def test_ffmpeg_diagnostic_reports_a_crash_with_the_real_stderr(monkeypatch):
+    class FakeCompletedProcess:
+        returncode = 1
+        stdout = ""
+        stderr = "dyld[123]: Library not loaded: /opt/homebrew/opt/x265/lib/libx265.216.dylib\n"
+
+    monkeypatch.setattr(media, "which", lambda name: "/opt/homebrew/bin/ffmpeg")
+    monkeypatch.setattr(media.subprocess, "run", lambda *a, **k: FakeCompletedProcess())
+    ok, detail = media.ffmpeg_diagnostic()
+    assert ok is False
+    assert "libx265" in detail
+
+
 def _basic_cfg(shots, sources, work, out, **extra):
     cfg = {
         "video": "testvid",
