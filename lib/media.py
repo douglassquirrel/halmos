@@ -107,9 +107,18 @@ def make_still(beat, prompt, style, outdir="frames", force=False):
     from google.genai import types
 
     c = gem.client()
+    # image_size doesn't exist in ImageConfig on every supported google-genai
+    # version (confirmed absent in the real 1.47.0 source - the version a
+    # user on Python 3.9 is capped at, since 2.0.0+ needs Python >=3.10 - even
+    # though it exists on newer ones) - only pass it when the installed SDK
+    # actually has it, rather than requiring every user to be on the newest
+    # SDK just for this one resolution hint.
+    image_config_kwargs = {"aspect_ratio": "9:16"}
+    if "image_size" in types.ImageConfig.model_fields:
+        image_config_kwargs["image_size"] = "1K"
     cfg = types.GenerateContentConfig(
         response_modalities=["IMAGE"],
-        image_config=types.ImageConfig(aspect_ratio="9:16", image_size="1K"),
+        image_config=types.ImageConfig(**image_config_kwargs),
         http_options=types.HttpOptions(timeout=180_000),
     )
     resp = c.models.generate_content(

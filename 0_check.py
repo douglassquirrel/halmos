@@ -90,7 +90,7 @@ def main():
         print(f"OK       the google-genai package is installed ({version})")
     except SystemExit as e:
         problems.append(str(e))
-        print("MISSING  the google-genai package (or it's too old - see below)")
+        print("MISSING  the google-genai package")
 
     try:
         gem.api_key()

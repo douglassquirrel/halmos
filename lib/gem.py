@@ -84,57 +84,29 @@ def api_key():
     sys.exit("No API key found.\n\n" + key_instructions())
 
 
-# The real, verified minimum for a feature this code depends on:
-# ImageConfig's `image_size` field, added in google-genai 1.27.0 (confirmed
-# against the SDK's own CHANGELOG). README tells a real user to just `pip
-# install google-genai` with no version pin at all, so an install from
-# before that existed fails with a raw SDK validation error deep in a real
-# run - found live, 2026-09-07.
-#
-# NOT the version this project's own dev venv happens to have (2.22.0) -
-# an earlier version of this check used that instead, which was its own
-# real bug: a user on Python 3.9 (already end-of-life; google-genai 2.0.0
-# requires Python >=3.10, confirmed against PyPI's release metadata) was
-# capped by pip itself at 1.47.0, a version with everything this code
-# needs, and got wrongly rejected. Pin this to the actual requirement, not
-# to whatever a contributor's own venv happens to be running.
-MIN_GOOGLE_GENAI_VERSION = "1.27.0"
-
-
-def _parse_version(v):
-    """(2, 22, 0) from "2.22.0" - good enough for this comparison without
-    adding the `packaging` dependency this project deliberately avoids
-    (README's whole pitch is "one add-on, google-genai, and nothing else").
-    Only a segment's LEADING digits count (e.g. "0rc1" -> 0, not 01 -> 1),
-    so a pre-release suffix doesn't get parsed as extra version digits."""
-    parts = []
-    for p in v.split("."):
-        m = re.match(r"\d+", p)
-        parts.append(int(m.group()) if m else 0)
-    return tuple(parts)
-
-
+# A hard version floor was tried here twice (2.22.0, then "corrected" to
+# 1.27.0 for ImageConfig's image_size field) and both were wrong - found
+# live, 2026-09-07, against a real user on Python 3.9 (already
+# end-of-life; google-genai 2.0.0+ requires Python >=3.10, confirmed
+# against PyPI's release metadata). Direct inspection of the real 1.47.0
+# source - the version pip itself caps that user at - showed image_size
+# doesn't exist in ImageConfig there at all, even though the changelog
+# said it was added at 1.27.0 (evidently for a different/Vertex-specific
+# config, not this one). No single version number is both "old enough to
+# accept" and "new enough to have every feature used," because Python 3.9
+# users can never reach a version with image_size at all. The actual fix
+# is per-feature detection at the call site (see media.make_still()),
+# not a version gate here - removed rather than guessed at a third time.
 def need_package():
     """Check once, up front, with a message a person can act on. Without this the
     first thing a new user sees is a Python traceback."""
     try:
-        import google.genai
+        import google.genai  # noqa: F401
     except ImportError:
         sys.exit(
             "\nThe google-genai package is not installed.\n\n"
             "  Run this, then try again:\n"
             "      pip install google-genai\n\n"
-            "  (If 'pip' is not found, try 'pip3' or 'python3 -m pip'.)\n"
-        )
-    installed = getattr(google.genai, "__version__", None)
-    if installed and _parse_version(installed) < _parse_version(MIN_GOOGLE_GENAI_VERSION):
-        sys.exit(
-            f"\nYour google-genai package ({installed}) is older than halmos needs "
-            f"({MIN_GOOGLE_GENAI_VERSION}+). Some things it uses (like image_size in "
-            "ImageConfig) don't exist yet in your version, and would fail with a "
-            "confusing error partway through a real run instead of this message.\n\n"
-            "  Run this, then try again:\n"
-            "      pip install --upgrade google-genai\n\n"
             "  (If 'pip' is not found, try 'pip3' or 'python3 -m pip'.)\n"
         )
 

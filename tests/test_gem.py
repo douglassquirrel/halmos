@@ -125,58 +125,13 @@ def test_check_budget_over_the_cap_exits_with_the_totals(isolated_home):
 
 
 # ------------------------------------------------------ need_package -------
-# README tells a real user to just `pip install google-genai` with no
-# version pin at all, unlike requirements-dev.txt's own floor for this
-# venv - so a stale install can lack a field this code relies on (found
-# live, 2026-09-07: ImageConfig's `image_size`, added in google-genai
-# 1.27.0) and fail with a raw SDK validation error deep in a real run
-# instead of a clear message up front.
-#
-# MIN_GOOGLE_GENAI_VERSION was originally set to 2.22.0 - this project's
-# own dev venv version - rather than the real, verified minimum for the
-# one feature actually depended on. That overreach was found live too: a
-# real user on Python 3.9 (which google-genai 2.0.0 dropped support for -
-# confirmed against PyPI's own release metadata) was capped by pip itself
-# at 1.47.0, a version that already has image_size and everything else
-# this code uses, and got wrongly rejected by the too-strict floor.
-# Corrected to 1.27.0, the actual verified requirement.
-def test_parse_version_reads_a_plain_semver():
-    assert gem._parse_version("2.22.0") == (2, 22, 0)
-
-
-def test_parse_version_drops_non_digit_suffixes():
-    assert gem._parse_version("1.27.0rc1") == (1, 27, 0)
-
-
-def test_parse_version_orders_correctly_for_comparison():
-    assert gem._parse_version("1.27.0") < gem._parse_version("2.22.0")
-    assert gem._parse_version("2.9.0") < gem._parse_version("2.10.0")  # not string-order
-
-
+# A hard version floor was tried here twice (2.22.0, then "corrected" to
+# 1.27.0) and both were wrong - see lib/gem.py's comment above
+# need_package() for the full story. No single version number works for
+# every Python: google-genai 2.0.0+ needs Python >=3.10, so a user on
+# Python 3.9 can never reach a version with every feature halmos might
+# use. Removed the version gate entirely in favour of per-feature
+# detection at each call site (see media.make_still()).
 @requires_google_genai
-def test_need_package_passes_when_the_installed_version_is_new_enough():
-    gem.need_package()  # this venv's real google-genai is >= MIN_GOOGLE_GENAI_VERSION
-
-
-@requires_google_genai
-def test_need_package_accepts_a_real_version_capped_by_an_old_python(monkeypatch):
-    # The exact real case: Python 3.9 (already end-of-life) can't get past
-    # google-genai 1.47.0 via pip, since 2.0.0+ requires Python >=3.10 -
-    # but 1.47.0 is well past 1.27.0, so it has everything this code needs
-    # and must not be rejected.
-    import google.genai
-
-    monkeypatch.setattr(google.genai, "__version__", "1.47.0", raising=False)
-    gem.need_package()  # must not raise
-
-
-@requires_google_genai
-def test_need_package_exits_with_an_actionable_message_when_too_old(monkeypatch):
-    import google.genai
-
-    monkeypatch.setattr(google.genai, "__version__", "1.0.0", raising=False)
-    with pytest.raises(SystemExit) as exc_info:
-        gem.need_package()
-    message = str(exc_info.value)
-    assert "1.0.0" in message
-    assert "pip install --upgrade google-genai" in message
+def test_need_package_passes_when_the_package_is_installed():
+    gem.need_package()  # does not raise - the real package is importable

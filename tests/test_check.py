@@ -28,31 +28,30 @@ def test_check_passes_when_everything_is_present(check_cli, monkeypatch, capsys)
 
 
 @requires_google_genai
-def test_check_reports_a_too_old_google_genai_with_the_real_message(check_cli, monkeypatch, capsys):
-    # Found live, 2026-09-07: a google-genai install from before a feature
-    # this code relies on existed (ImageConfig's image_size, added in
-    # 1.27.0) fails with a raw SDK validation error deep inside 1_plan.py
-    # instead of this clear, up-front message. need_package() itself
-    # already carries the actionable text (see test_gem.py) - 0_check.py
-    # should surface it verbatim, not write its own summary of it.
+def test_check_reports_whatever_need_package_says_on_failure(check_cli, monkeypatch, capsys):
+    # 0_check.py delegates entirely to gem.need_package() for this check
+    # (see lib/gem.py's own comment on why there's no version gate here
+    # any more - two hard version floors were both wrong in practice) -
+    # this just confirms 0_check.py surfaces whatever it says verbatim
+    # rather than writing its own summary of it.
     monkeypatch.setattr(check_cli, "which", lambda name: "/usr/bin/" + name)
     monkeypatch.setattr(media, "ffmpeg_diagnostic", lambda: (True, ""))
     monkeypatch.setattr(media, "has_ffmpeg_filter", lambda name: True)
     monkeypatch.setattr(gem, "api_key", lambda: "fake-key")
 
-    def too_old():
+    def missing():
         import sys
 
-        sys.exit("Your google-genai package (1.0.0) is older than halmos needs (2.22.0+).")
+        sys.exit("The google-genai package is not installed.")
 
-    monkeypatch.setattr(gem, "need_package", too_old)
+    monkeypatch.setattr(gem, "need_package", missing)
 
     with pytest.raises(SystemExit):
         check_cli.main()
 
     out = capsys.readouterr().out
-    assert "MISSING  the google-genai package (or it's too old" in out
-    assert "1.0.0" in out
+    assert "MISSING  the google-genai package" in out
+    assert "not installed" in out
     assert "1 problem(s) found" in out
 
 

@@ -122,6 +122,38 @@ def test_make_still_returns_none_when_no_image_comes_back(monkeypatch, isolated_
     assert not (outdir / "1.png").exists()
 
 
+def test_make_still_omits_image_size_when_the_installed_sdk_lacks_it(
+    monkeypatch, isolated_home, tmp_path
+):
+    # Found live, 2026-09-07: image_size doesn't exist in ImageConfig on
+    # every supported google-genai version - confirmed absent in the real
+    # 1.47.0 source (the version a real user on Python 3.9 is capped at,
+    # since 2.0.0+ requires Python >=3.10) even though it exists on this
+    # venv's 2.22.0. A hard version floor can't fix this for that user at
+    # all - no version installable on their Python has both this field and
+    # whatever else halmos needs - so make_still() must degrade instead:
+    # only pass image_size when the installed ImageConfig actually has it.
+    from google.genai import types
+
+    class OldImageConfig:
+        model_fields = {"aspect_ratio": object()}  # no "image_size", like 1.47.0
+
+        def __init__(self, **kwargs):
+            extra = set(kwargs) - set(self.model_fields)
+            if extra:
+                raise ValueError(f"1 validation error for ImageConfig - Extra inputs: {extra}")
+            self.kwargs = kwargs
+
+    monkeypatch.setattr(types, "ImageConfig", OldImageConfig)
+    monkeypatch.setattr(gem, "client", lambda: FakeClient(FakeImageResponse(b"fake-png-bytes")))
+    outdir = tmp_path / "frames"
+    outdir.mkdir()
+
+    dst = media.make_still("1", "a prompt", "a style", outdir=str(outdir))
+
+    assert dst == f"{outdir}/1.png"
+
+
 def test_make_still_skips_regenerating_an_existing_still(monkeypatch, isolated_home, tmp_path):
     outdir = tmp_path / "frames"
     outdir.mkdir()

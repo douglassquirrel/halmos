@@ -101,10 +101,6 @@ pip3 install --user --break-system-packages google-genai
 installing one library like this rather than a whole project's worth. See
 `TROUBLESHOOTING.md` for another way, if you'd rather not use them.)
 
-**Already had `google-genai` installed from before?** Make sure it's
-recent — `pip install --upgrade google-genai`. `python3 0_check.py` (see
-below) tells you if it's too old.
-
 ## 2. A Google API key
 
 1. Go to **aistudio.google.com** and sign in with a Google account.
