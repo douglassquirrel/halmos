@@ -1,6 +1,7 @@
 import pathlib
 
 import pytest
+from conftest import requires_google_genai
 
 from lib import gem
 
@@ -121,3 +122,40 @@ def test_check_budget_over_the_cap_exits_with_the_totals(isolated_home):
     assert "$21.00" in message  # 16.00 already spent + 5.00 about to spend
     assert "$20.00 ceiling" in message
     assert "$16.00" in message  # "Already spent" figure
+
+
+# ------------------------------------------------------ need_package -------
+# README tells a real user to just `pip install google-genai` with no
+# version pin at all, unlike requirements-dev.txt's own `>=2.22.0` floor for
+# this venv - so a stale install can lack a field this code relies on
+# (found live, 2026-09-07: ImageConfig's `image_size`, added in google-genai
+# 1.27.0) and fail with a raw SDK validation error deep in a real run
+# instead of a clear message up front.
+def test_parse_version_reads_a_plain_semver():
+    assert gem._parse_version("2.22.0") == (2, 22, 0)
+
+
+def test_parse_version_drops_non_digit_suffixes():
+    assert gem._parse_version("1.27.0rc1") == (1, 27, 0)
+
+
+def test_parse_version_orders_correctly_for_comparison():
+    assert gem._parse_version("1.27.0") < gem._parse_version("2.22.0")
+    assert gem._parse_version("2.9.0") < gem._parse_version("2.10.0")  # not string-order
+
+
+@requires_google_genai
+def test_need_package_passes_when_the_installed_version_is_new_enough():
+    gem.need_package()  # this venv's real google-genai is >= MIN_GOOGLE_GENAI_VERSION
+
+
+@requires_google_genai
+def test_need_package_exits_with_an_actionable_message_when_too_old(monkeypatch):
+    import google.genai
+
+    monkeypatch.setattr(google.genai, "__version__", "1.0.0", raising=False)
+    with pytest.raises(SystemExit) as exc_info:
+        gem.need_package()
+    message = str(exc_info.value)
+    assert "1.0.0" in message
+    assert "pip install --upgrade google-genai" in message

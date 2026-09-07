@@ -16,6 +16,7 @@ def test_check_passes_when_everything_is_present(check_cli, monkeypatch, capsys)
     monkeypatch.setattr(check_cli, "which", lambda name: "/usr/bin/" + name)
     monkeypatch.setattr(media, "ffmpeg_diagnostic", lambda: (True, ""))
     monkeypatch.setattr(media, "has_ffmpeg_filter", lambda name: True)
+    monkeypatch.setattr(gem, "need_package", lambda: None)
     monkeypatch.setattr(gem, "api_key", lambda: "fake-key")
 
     check_cli.main()  # does not raise - everything is OK
@@ -24,6 +25,35 @@ def test_check_passes_when_everything_is_present(check_cli, monkeypatch, capsys)
     assert "MISSING" not in out
     assert "BROKEN" not in out
     assert "Run  python3 1_plan.py" in out
+
+
+@requires_google_genai
+def test_check_reports_a_too_old_google_genai_with_the_real_message(check_cli, monkeypatch, capsys):
+    # Found live, 2026-09-07: a google-genai install from before a feature
+    # this code relies on existed (ImageConfig's image_size, added in
+    # 1.27.0) fails with a raw SDK validation error deep inside 1_plan.py
+    # instead of this clear, up-front message. need_package() itself
+    # already carries the actionable text (see test_gem.py) - 0_check.py
+    # should surface it verbatim, not write its own summary of it.
+    monkeypatch.setattr(check_cli, "which", lambda name: "/usr/bin/" + name)
+    monkeypatch.setattr(media, "ffmpeg_diagnostic", lambda: (True, ""))
+    monkeypatch.setattr(media, "has_ffmpeg_filter", lambda name: True)
+    monkeypatch.setattr(gem, "api_key", lambda: "fake-key")
+
+    def too_old():
+        import sys
+
+        sys.exit("Your google-genai package (1.0.0) is older than halmos needs (2.22.0+).")
+
+    monkeypatch.setattr(gem, "need_package", too_old)
+
+    with pytest.raises(SystemExit):
+        check_cli.main()
+
+    out = capsys.readouterr().out
+    assert "MISSING  the google-genai package (or it's too old" in out
+    assert "1.0.0" in out
+    assert "1 problem(s) found" in out
 
 
 @requires_google_genai

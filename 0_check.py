@@ -83,12 +83,14 @@ def main():
             print("MISSING  the label-drawing library (drawtext)")
 
     try:
-        import google.genai  # noqa: F401
+        gem.need_package()
+        import google.genai
 
-        print("OK       the google-genai package is installed")
-    except ImportError:
-        problems.append("The google-genai package is not installed. Run:  pip install google-genai")
-        print("MISSING  the google-genai package")
+        version = getattr(google.genai, "__version__", "unknown version")
+        print(f"OK       the google-genai package is installed ({version})")
+    except SystemExit as e:
+        problems.append(str(e))
+        print("MISSING  the google-genai package (or it's too old - see below)")
 
     try:
         gem.api_key()

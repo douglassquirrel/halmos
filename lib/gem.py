@@ -84,16 +84,50 @@ def api_key():
     sys.exit("No API key found.\n\n" + key_instructions())
 
 
+# The version this pipeline is actually tested against (requirements-dev.txt
+# pins the same floor). README tells a real user to just `pip install
+# google-genai` with no version pin at all, so an install from before a
+# feature this code relies on existed fails with a raw SDK validation error
+# deep in a real run - found live, 2026-09-07, against `ImageConfig`'s
+# `image_size` field (added in google-genai 1.27.0). Checking the version
+# up front turns that into one clear message instead.
+MIN_GOOGLE_GENAI_VERSION = "2.22.0"
+
+
+def _parse_version(v):
+    """(2, 22, 0) from "2.22.0" - good enough for this comparison without
+    adding the `packaging` dependency this project deliberately avoids
+    (README's whole pitch is "one add-on, google-genai, and nothing else").
+    Only a segment's LEADING digits count (e.g. "0rc1" -> 0, not 01 -> 1),
+    so a pre-release suffix doesn't get parsed as extra version digits."""
+    parts = []
+    for p in v.split("."):
+        m = re.match(r"\d+", p)
+        parts.append(int(m.group()) if m else 0)
+    return tuple(parts)
+
+
 def need_package():
     """Check once, up front, with a message a person can act on. Without this the
     first thing a new user sees is a Python traceback."""
     try:
-        import google.genai  # noqa: F401
+        import google.genai
     except ImportError:
         sys.exit(
             "\nThe google-genai package is not installed.\n\n"
             "  Run this, then try again:\n"
             "      pip install google-genai\n\n"
+            "  (If 'pip' is not found, try 'pip3' or 'python3 -m pip'.)\n"
+        )
+    installed = getattr(google.genai, "__version__", None)
+    if installed and _parse_version(installed) < _parse_version(MIN_GOOGLE_GENAI_VERSION):
+        sys.exit(
+            f"\nYour google-genai package ({installed}) is older than halmos needs "
+            f"({MIN_GOOGLE_GENAI_VERSION}+). Some things it uses (like image_size in "
+            "ImageConfig) don't exist yet in your version, and would fail with a "
+            "confusing error partway through a real run instead of this message.\n\n"
+            "  Run this, then try again:\n"
+            "      pip install --upgrade google-genai\n\n"
             "  (If 'pip' is not found, try 'pip3' or 'python3 -m pip'.)\n"
         )
 
