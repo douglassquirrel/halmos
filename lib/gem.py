@@ -84,14 +84,21 @@ def api_key():
     sys.exit("No API key found.\n\n" + key_instructions())
 
 
-# The version this pipeline is actually tested against (requirements-dev.txt
-# pins the same floor). README tells a real user to just `pip install
-# google-genai` with no version pin at all, so an install from before a
-# feature this code relies on existed fails with a raw SDK validation error
-# deep in a real run - found live, 2026-09-07, against `ImageConfig`'s
-# `image_size` field (added in google-genai 1.27.0). Checking the version
-# up front turns that into one clear message instead.
-MIN_GOOGLE_GENAI_VERSION = "2.22.0"
+# The real, verified minimum for a feature this code depends on:
+# ImageConfig's `image_size` field, added in google-genai 1.27.0 (confirmed
+# against the SDK's own CHANGELOG). README tells a real user to just `pip
+# install google-genai` with no version pin at all, so an install from
+# before that existed fails with a raw SDK validation error deep in a real
+# run - found live, 2026-09-07.
+#
+# NOT the version this project's own dev venv happens to have (2.22.0) -
+# an earlier version of this check used that instead, which was its own
+# real bug: a user on Python 3.9 (already end-of-life; google-genai 2.0.0
+# requires Python >=3.10, confirmed against PyPI's release metadata) was
+# capped by pip itself at 1.47.0, a version with everything this code
+# needs, and got wrongly rejected. Pin this to the actual requirement, not
+# to whatever a contributor's own venv happens to be running.
+MIN_GOOGLE_GENAI_VERSION = "1.27.0"
 
 
 def _parse_version(v):

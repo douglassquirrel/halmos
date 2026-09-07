@@ -7,7 +7,7 @@
 #   pytest --cov=lib --cov-report=term-missing
 #   ruff check .
 
-google-genai>=2.22.0
+google-genai>=1.27.0
 pytest>=9.1
 pytest-cov>=7.1
 ruff>=0.16
