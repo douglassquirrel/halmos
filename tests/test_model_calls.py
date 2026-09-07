@@ -236,6 +236,40 @@ def test_transcribe_parses_word_timings(monkeypatch, isolated_home, tmp_path):
     assert len(saved["words"]) == 3
 
 
+def test_transcribe_omits_word_timestamp_when_the_installed_sdk_lacks_it(
+    monkeypatch, isolated_home, tmp_path
+):
+    # Found live, 2026-09-07 - the same bug class as make_still()'s
+    # image_size, a different field: AudioTranscriptionConfig has ZERO
+    # fields at all in the real google-genai 1.47.0 source (the version a
+    # real user on Python 3.9 is capped at, since 2.0.0+ needs Python
+    # >=3.10) - word_timestamp doesn't exist there, so constructing
+    # AudioTranscriptionConfig(word_timestamp=True) raised a pydantic
+    # "Extra inputs are not permitted" error on every single run, before
+    # any network call. Same fix as make_still(): only pass the kwarg when
+    # the installed SDK's own model actually defines it.
+    import json
+
+    from google.genai import types
+
+    class OldAudioTranscriptionConfig:
+        model_fields = {}  # zero fields at all, like the real 1.47.0
+
+        def __init__(self, **kwargs):
+            extra = set(kwargs) - set(self.model_fields)
+            if extra:
+                raise ValueError(f"Extra inputs are not permitted: {extra}")
+
+    monkeypatch.setattr(types, "AudioTranscriptionConfig", OldAudioTranscriptionConfig)
+    payload = json.loads(fixture_text("transcript_words.json"))
+    monkeypatch.setattr(gem, "client", lambda: FakeClient(FakeTranscribeResponse(payload)))
+
+    out_path = tmp_path / "words.json"
+    words = media.transcribe("narration.m4a", out=str(out_path))
+
+    assert [w["w"] for w in words] == ["hello", "there", "world"]
+
+
 def test_transcribe_exits_when_no_words_come_back(monkeypatch, isolated_home, tmp_path):
     monkeypatch.setattr(
         gem, "client", lambda: FakeClient(FakeTranscribeResponse({"text": "", "words": []}))

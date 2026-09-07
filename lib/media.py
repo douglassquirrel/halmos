@@ -188,11 +188,20 @@ def transcribe(audio, out="words.json"):
 
     c = gem.client()
     up = c.files.upload(file=audio)
+    # word_timestamp doesn't exist in AudioTranscriptionConfig on every
+    # supported google-genai version - confirmed absent (the whole config
+    # has zero fields at all) in the real 1.47.0 source, the version a user
+    # on Python 3.9 is capped at, since 2.0.0+ needs Python >=3.10 - only
+    # pass it when the installed SDK actually has it. Same pattern as
+    # make_still()'s image_size handling.
+    atc_kwargs = {}
+    if "word_timestamp" in types.AudioTranscriptionConfig.model_fields:
+        atc_kwargs["word_timestamp"] = True
     r = c.models.generate_content(
         model=ASR_MODEL,
         contents=[up],
         config=types.GenerateContentConfig(
-            audio_transcription_config=types.AudioTranscriptionConfig(word_timestamp=True)
+            audio_transcription_config=types.AudioTranscriptionConfig(**atc_kwargs)
         ),
     )
     at = r.candidates[0].content.parts[0].audio_transcription
