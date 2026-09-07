@@ -14,6 +14,7 @@ import pathlib
 import re
 import subprocess
 import sys
+import textwrap
 import time
 import urllib.request
 from shutil import which
@@ -131,8 +132,11 @@ def make_still(beat, prompt, style, outdir="frames", force=False):
     return dst
 
 
-def contact_sheet(beats, outdir="frames", dst="contact_sheet.png", cols=4, work="work"):
-    """One picture of all the shots, with the beat name burned on each."""
+def contact_sheet(beats, outdir="frames", dst="contact_sheet.png", cols=4, work="work", texts=None):
+    """One picture of all the shots, with the beat name burned on each -
+    and, if `texts` (a {beat: sentence} dict) is given, that beat's actual
+    sentence too, so a human reviewing the sheet can tell what a picture is
+    SUPPOSED to be about, not just which beat it is."""
     paths = [f"{outdir}/{b}.png" for b in beats if os.path.exists(f"{outdir}/{b}.png")]
     if not paths:
         return None
@@ -140,10 +144,26 @@ def contact_sheet(beats, outdir="frames", dst="contact_sheet.png", cols=4, work=
     # labelled stills are written as a numbered sequence and read back as one.
     sheet_dir = f"{work}/sheet"
     os.makedirs(sheet_dir, exist_ok=True)
-    for f in glob.glob(f"{sheet_dir}/*.png"):
+    for f in glob.glob(f"{sheet_dir}/*.png") + glob.glob(f"{sheet_dir}/*.txt"):
         os.remove(f)
     present = [b for b in beats if os.path.exists(f"{outdir}/{b}.png")]
     for i, b in enumerate(present):
+        vf = (
+            f"scale=360:-1,pad=iw+8:ih+8:4:4:color=white,"
+            f"drawtext=text='{b}':x=16:y=16:fontsize=34:fontcolor=white:"
+            f"box=1:boxcolor=black@0.75:boxborderw=10"
+        )
+        sentence = (texts or {}).get(b)
+        if sentence:
+            # A sentence's own punctuation (apostrophes, colons) is
+            # meaningful to ffmpeg's filter syntax too - textfile= reads it
+            # from a plain file instead, sidestepping escaping altogether.
+            caption_path = f"{sheet_dir}/{i:03d}.txt"
+            pathlib.Path(caption_path).write_text("\n".join(textwrap.wrap(sentence, width=30)))
+            vf += (
+                f",drawtext=textfile='{caption_path}':x=16:y=h-text_h-16:fontsize=20:"
+                f"fontcolor=white:box=1:boxcolor=black@0.6:boxborderw=6:line_spacing=4"
+            )
         run(
             [
                 "ffmpeg",
@@ -153,9 +173,7 @@ def contact_sheet(beats, outdir="frames", dst="contact_sheet.png", cols=4, work=
                 "-i",
                 f"{outdir}/{b}.png",
                 "-vf",
-                f"scale=360:-1,pad=iw+8:ih+8:4:4:color=white,"
-                f"drawtext=text='{b}':x=16:y=16:fontsize=34:fontcolor=white:"
-                f"box=1:boxcolor=black@0.75:boxborderw=10",
+                vf,
                 f"{sheet_dir}/{i:03d}.png",
             ],
             "labelling stills",

@@ -99,13 +99,19 @@ def main(argv=None):  # noqa: C901 - a linear script's main(), not a candidate f
     frames_dir = project_dir / "frames"
     os.makedirs(frames_dir, exist_ok=True)
     for i, b in enumerate(beats):
+        tag = f"[{i + 1}/{len(beats)}]"
         try:
             p = media.make_still(b["beat"], prompts[b["beat"]], style, outdir=str(frames_dir))
-            gem.say(f"  {b['beat']}" + ("" if p else "  FAILED - will retry once"))
             if not p:
-                media.make_still(
+                gem.say(f"  {tag} picture {b['beat']} came back empty - retrying once")
+                p = media.make_still(
                     b["beat"], prompts[b["beat"]], style, outdir=str(frames_dir), force=True
                 )
+            gem.say(
+                f"  {tag} drew picture {b['beat']}"
+                if p
+                else f"  {tag} picture {b['beat']} failed again - moving on"
+            )
         except Exception as e:  # noqa: BLE001
             if gem.classify_error(e) in ("bad_key", "billing", "quota", "model_not_found"):
                 # Every remaining picture would fail the same way - stop now
@@ -114,7 +120,7 @@ def main(argv=None):  # noqa: C901 - a linear script's main(), not a candidate f
                     f"\nStopped at beat {b['beat']} ({i}/{len(beats)} pictures already drawn, "
                     f"${gem.spent_so_far():.2f} spent so far).\n\n{gem.explain_error(e)}\n"
                 )
-            gem.say(f"  {b['beat']}  FAILED ({str(e)[:60]})")
+            gem.say(f"  {tag} picture {b['beat']} FAILED ({str(e)[:60]})")
 
     missing = [b["beat"] for b in beats if not (frames_dir / f"{b['beat']}.png").exists()]
     if missing:
@@ -136,6 +142,7 @@ def main(argv=None):  # noqa: C901 - a linear script's main(), not a candidate f
     gem.say("Checking each picture against its sentence...")
     fixed = 0
     for i, b in enumerate(beats):
+        tag = f"[{i + 1}/{len(beats)}]"
         img = frames_dir / f"{b['beat']}.png"
         if not img.exists():
             continue
@@ -150,14 +157,18 @@ def main(argv=None):  # noqa: C901 - a linear script's main(), not a candidate f
             )
         except Exception:
             v = None
-        if v is not None and not v.get("ok") and v.get("revised_prompt"):
+        if v is None:
+            gem.say(f"  {tag} could not check {b['beat']} - leaving it as drawn")
+        elif not v.get("ok") and v.get("revised_prompt"):
             why = "; ".join(v.get("problems", []))[:70]
-            gem.say(f"  {b['beat']}: {why} - redrawing")
+            gem.say(f"  {tag} {b['beat']}: {why} - redrawing")
             prompts[b["beat"]] = v["revised_prompt"]
             media.make_still(
                 b["beat"], prompts[b["beat"]], style, outdir=str(frames_dir), force=True
             )
             fixed += 1
+        else:
+            gem.say(f"  {tag} checked {b['beat']} and it matches the sentence")
         if i < len(beats) - 1:
             # One gem.ask() call per beat, back to back, otherwise trips the
             # ~2/minute rate limit near the end of a long loop - see
@@ -170,7 +181,11 @@ def main(argv=None):  # noqa: C901 - a linear script's main(), not a candidate f
     order = [b["beat"] for b in beats]
     contact_sheet = project_dir / "contact_sheet.png"
     media.contact_sheet(
-        order, outdir=str(frames_dir), dst=str(contact_sheet), work=str(project_dir / "work")
+        order,
+        outdir=str(frames_dir),
+        dst=str(contact_sheet),
+        work=str(project_dir / "work"),
+        texts={b["beat"]: b["text"] for b in beats},
     )
 
     json.dump(
@@ -193,6 +208,7 @@ def main(argv=None):  # noqa: C901 - a linear script's main(), not a candidate f
 
     narration_script = project_dir / "narration_script.txt"
     narration_audio_dir = project_dir / "audio"
+    os.makedirs(narration_audio_dir, exist_ok=True)
     with open(narration_script, "w") as f:
         f.write("READ THIS ALOUD AND RECORD IT\n")
         f.write("=" * 60 + "\n\n")

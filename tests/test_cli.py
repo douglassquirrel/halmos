@@ -500,8 +500,12 @@ def _run_plan_then_prepare_make(plan_cli, tmp_path, monkeypatch, n_beats=1):
         assert (project_dir / "frames" / f"{n}.png").exists()
     plan_data = json.loads((project_dir / "plan.json").read_text())
     assert plan_data["style_source"] == str(project_dir / "style_block.txt")
+    # 1_plan.py tells the user to save their recording into audio/ - it
+    # should exist already, not be one more folder they have to create
+    # themselves first (found live, 2026-09-07).
+    assert (project_dir / "audio").is_dir()
 
-    (project_dir / "audio").mkdir()
+    (project_dir / "audio").mkdir(exist_ok=True)
     (project_dir / "audio" / "narration.m4a").write_bytes(b"not real audio - transcribe is faked")
     step = 0.15  # tight enough that 45 words stay under the 8s split ceiling
     fake_words = {

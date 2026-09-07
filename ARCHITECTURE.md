@@ -246,6 +246,26 @@ priority over the recorded one).
 Read the two scripts top to bottom; there is no indirection to trace through
 beyond the `lib/` calls documented above.
 
+### Progress reporting
+
+**Every loop over more than one item must print one line per item**, via
+`gem.say()`, in this shape: `f"  [{done}/{total}] <verb> <beat>"` — e.g.
+`"  [3/12] drew picture 2a"`, `"  [7/12] checked 5b and it matches the
+sentence"`. The `[done/total]` counter and a plain verb describing what
+actually happened (not just the beat name alone) are both required — a
+bare `gem.say(f"  {beat}")` looks like nothing happened. This applies
+equally to the happy path and to non-fatal failures (`"came back empty -
+retrying once"`, `"FAILED (...)"`) — a step that silently skips printing
+for the success case and only speaks up on failure looks identical to a
+hung process from the outside. Found live, 2026-09-07: the still-review
+loop only ever printed something when a picture needed redrawing, so a
+run where every picture passed produced no output at all for several
+minutes while the pacing sleep (`gem.TEXT_MODEL_PACING_SECONDS`) ran.
+
+Single-call steps (transcription, music, the final `edit.build()`) don't
+need a counter — announcing the step once (`gem.say("Writing music...")`)
+is enough, since there's no per-item progress to show.
+
 ## Known structural gaps, for context
 
 - **Clip generation and the edit have no CLI tests.** `tests/test_cli.py`'s

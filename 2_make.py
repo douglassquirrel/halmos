@@ -108,10 +108,10 @@ def main(argv=None):  # noqa: C901 - a linear script's main(), not a candidate f
             {"beat": b, "text": texts[b], "prompt": prompts[b], "note": n} for b, n in corr.items()
         ]
         new = plan.apply_corrections(items, style)
-        for b, pr in new.items():
+        for i, (b, pr) in enumerate(new.items()):
             prompts[b] = pr
             media.make_still(b, pr, style, outdir=str(frames_dir), force=True)
-            gem.say(f"  {b} redrawn")
+            gem.say(f"  [{i + 1}/{len(new)}] redrew picture {b}")
         for b in beats:
             b["prompt"] = prompts[b["beat"]]
         json.dump(P, open(plan_json, "w"), indent=2)
@@ -120,6 +120,7 @@ def main(argv=None):  # noqa: C901 - a linear script's main(), not a candidate f
             outdir=str(frames_dir),
             dst=str(project_dir / "contact_sheet.png"),
             work=str(work_dir),
+            texts=texts,
         )
         gem.say("  contact_sheet.png updated.")
 
@@ -163,10 +164,13 @@ def main(argv=None):  # noqa: C901 - a linear script's main(), not a candidate f
         gem.say("  writing pictures for the new halves...")
         newbeats = [{"beat": sh["beat"], "text": sh["text"]} for sh in shots if sh["beat"] in made]
         extra = plan.write_prompts(newbeats, style)
+        drawn_new = 0
         for sh in shots:
             if sh["beat"] in extra:
                 prompts[sh["beat"]] = extra[sh["beat"]]
                 media.make_still(sh["beat"], extra[sh["beat"]], style, outdir=str(frames_dir))
+                drawn_new += 1
+                gem.say(f"  [{drawn_new}/{len(made)}] drew picture {sh['beat']}")
 
     # ---- 3. the clips -------------------------------------------------------
     def clip_path(beat):
@@ -224,7 +228,11 @@ def main(argv=None):  # noqa: C901 - a linear script's main(), not a candidate f
             if made_it:
                 break
         done += 1
-        gem.say(f"  [{done}/{len(shots)}] {b}" + ("" if made_it else "  NO CLIP"))
+        gem.say(
+            f"  [{done}/{len(shots)}] generated clip {b}"
+            if made_it
+            else f"  [{done}/{len(shots)}] {b}: NO CLIP"
+        )
         if not made_it and quota_exhausted_models.issuperset(s["clip_models"]):
             # Every configured model is confirmed out of today's allowance -
             # the remaining shots would each fail the same way.
@@ -275,7 +283,10 @@ def main(argv=None):  # noqa: C901 - a linear script's main(), not a candidate f
         sh["in"], sh["in_note"] = round(ip, 2), why
         if rev:
             sh["reverse"] = True
-        gem.say(f"  {sh['beat']}: from {ip:.1f}s{'  (reversed)' if rev else ''}  {why}")
+        gem.say(
+            f"  [{i + 1}/{len(shots)}] {sh['beat']}: from {ip:.1f}s"
+            f"{'  (reversed)' if rev else ''}  {why}"
+        )
         if i < len(shots) - 1:
             # One gem.ask() call per shot, back to back, otherwise trips the
             # ~2/minute rate limit near the end of a long loop - see

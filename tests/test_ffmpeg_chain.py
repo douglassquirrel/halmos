@@ -1,3 +1,5 @@
+import pathlib
+
 import pytest
 from conftest import pixel, requires_drawtext, requires_ffmpeg, requires_libass, stream_info
 
@@ -202,3 +204,72 @@ def test_contact_sheet_returns_none_with_no_stills(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     (tmp_path / "frames").mkdir()
     assert media.contact_sheet(["1", "2"], outdir="frames", dst="contact_sheet.png") is None
+
+
+@requires_drawtext
+def test_contact_sheet_writes_a_caption_file_per_beat_when_texts_given(
+    tmp_path, lavfi_still, monkeypatch
+):
+    # The picture alone only shows the beat name - a human reviewing the
+    # sheet has no way to tell what each picture is SUPPOSED to be about
+    # without also opening narration_script.txt side by side. Printing the
+    # actual sentence on the tile itself closes that gap. Verified via the
+    # caption file written for ffmpeg's textfile= (arbitrary sentence text
+    # needs real escaping ffmpeg's inline text= can't safely give it -
+    # apostrophes and colons are both meaningful to ffmpeg's own filter
+    # syntax), not by trying to pixel-check rendered text.
+    monkeypatch.chdir(tmp_path)
+    beats = ["1", "2"]
+    frames_dir = tmp_path / "frames"
+    frames_dir.mkdir()
+    for beat in beats:
+        lavfi_still(f"frames/{beat}.png", color="red", size=200)
+    texts = {"1": "A bee leaves the hive: it's time to swarm.", "2": "It dances for the others."}
+
+    dst = media.contact_sheet(
+        beats, outdir="frames", dst="contact_sheet.png", work="work", texts=texts
+    )
+
+    assert dst is not None
+    caption_files = sorted(pathlib.Path("work/sheet").glob("*.txt"))
+    assert len(caption_files) == 2
+    # Wrapped onto its own lines (the sentence is over 30 chars), but every
+    # word - punctuation included - survives, in order.
+    assert (
+        caption_files[0].read_text().split() == "A bee leaves the hive: it's time to swarm.".split()
+    )
+    assert caption_files[1].read_text().strip() == "It dances for the others."
+
+
+@requires_drawtext
+def test_contact_sheet_wraps_a_long_caption_across_lines(tmp_path, lavfi_still, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    frames_dir = tmp_path / "frames"
+    frames_dir.mkdir()
+    lavfi_still("frames/1.png", color="red", size=200)
+    long_text = "one two three four five six seven eight nine ten eleven twelve thirteen"
+
+    dst = media.contact_sheet(
+        ["1"], outdir="frames", dst="contact_sheet.png", work="work", texts={"1": long_text}
+    )
+
+    assert dst is not None
+    caption = pathlib.Path("work/sheet/000.txt").read_text()
+    assert "\n" in caption  # wrapped across more than one line, not one long run
+
+
+@requires_drawtext
+def test_contact_sheet_skips_a_beat_with_no_text_entry(tmp_path, lavfi_still, monkeypatch):
+    # texts is a dict that may not cover every beat (e.g. a beat added
+    # after the fact) - must not crash on a missing key.
+    monkeypatch.chdir(tmp_path)
+    frames_dir = tmp_path / "frames"
+    frames_dir.mkdir()
+    lavfi_still("frames/1.png", color="red", size=200)
+
+    dst = media.contact_sheet(
+        ["1"], outdir="frames", dst="contact_sheet.png", work="work", texts={}
+    )
+
+    assert dst is not None
+    assert list(pathlib.Path("work/sheet").glob("*.txt")) == []
