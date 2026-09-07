@@ -116,6 +116,23 @@ def main(argv=None):  # noqa: C901 - a linear script's main(), not a candidate f
                 )
             gem.say(f"  {b['beat']}  FAILED ({str(e)[:60]})")
 
+    missing = [b["beat"] for b in beats if not (frames_dir / f"{b['beat']}.png").exists()]
+    if missing:
+        # Matches 2_make.py's own clip loop, which already stops if ANY clip
+        # is missing, not only if all of them are - a single missing beat
+        # has no way to be flagged via corrections.txt (that only comments
+        # on a picture that exists and is wrong, not one that's silently
+        # absent), and every downstream step assumes every beat has one.
+        # Cheap to re-run either way: make_still() skips beats that already
+        # have a picture.
+        sys.exit(
+            f"\nSTOPPING: could not generate a picture for: {', '.join(missing)}\n"
+            f"(${gem.spent_so_far():.2f} spent so far). See the errors above for "
+            "why each one failed.\n"
+            "Nothing else was written - fix whatever they're pointing at and run "
+            "python3 1_plan.py again; it only retries what's missing.\n"
+        )
+
     gem.say("Checking each picture against its sentence...")
     fixed = 0
     for i, b in enumerate(beats):

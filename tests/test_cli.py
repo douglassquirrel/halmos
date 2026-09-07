@@ -178,6 +178,66 @@ def test_plan_stops_immediately_on_an_unrecoverable_still_error(plan_cli, tmp_pa
 
 @requires_ffmpeg
 @requires_google_genai
+def test_plan_stops_when_any_picture_could_not_be_generated(plan_cli, tmp_path, monkeypatch):
+    # Found live, 2026-09-07: a real run where every single make_still()
+    # call failed (a code-level SDK incompatibility, since fixed
+    # separately - but the gap this covers is general, not specific to
+    # that one cause) ran all the way through anyway - no exception ever
+    # classified as fatal, so the per-beat "FAILED" loop just kept going,
+    # then wrote plan.json/narration_script.txt and told the user to open
+    # a contact_sheet.png that media.contact_sheet() had silently declined
+    # to write (it returns None, not an error, when there are zero images
+    # to tile). Matches 2_make.py's own clip loop, which already stops if
+    # ANY clip is missing, not only if all of them are: a single missing
+    # beat has no way to be flagged via corrections.txt (that only
+    # comments on a picture that exists and is wrong, not one that's
+    # silently absent), and every downstream step - the contact sheet,
+    # 2_make.py's first-frame image conditioning - silently assumes every
+    # beat has one. Re-running is cheap either way, since make_still()
+    # skips beats that already have a picture. Simulated as "the second
+    # make_still() call returns None" rather than a specific exception,
+    # since that's the more general failure shape this needs to catch
+    # regardless of cause.
+    import pathlib
+
+    from lib import media
+
+    project_dir, script_text = _plan_project(tmp_path)
+    beats_response = FakeTextResponse(
+        json.dumps(
+            {
+                "beats": [
+                    {"beat": "1", "text": " ".join(script_text.split()[:22])},
+                    {"beat": "2", "text": " ".join(script_text.split()[22:])},
+                ]
+            }
+        )
+    )
+    prompts_response = FakeTextResponse(
+        json.dumps(
+            {"prompts": [{"beat": "1", "prompt": "a square"}, {"beat": "2", "prompt": "a circle"}]}
+        )
+    )
+    client = FakeClient([beats_response, prompts_response])
+    monkeypatch.setattr(gem, "client", lambda: client)
+
+    def one_beat_fails(beat, prompt, style, outdir="frames", force=False):
+        if beat == "2":
+            return None
+        pathlib.Path(outdir, f"{beat}.png").write_bytes(b"fake-png-bytes")
+        return f"{outdir}/{beat}.png"
+
+    monkeypatch.setattr(media, "make_still", one_beat_fails)
+
+    with pytest.raises(SystemExit, match="STOPPING.*could not generate a picture for: 2"):
+        plan_cli.main(["--out", str(project_dir)])
+
+    assert not (project_dir / "contact_sheet.png").exists()
+    assert not (project_dir / "plan.json").exists()
+
+
+@requires_ffmpeg
+@requires_google_genai
 def test_plan_stops_immediately_on_an_unrecoverable_review_error(plan_cli, tmp_path, monkeypatch):
     # Same fail-fast requirement for the still-review loop: plan.review_still
     # goes through gem.ask(), so an unrecoverable class comes back as a
