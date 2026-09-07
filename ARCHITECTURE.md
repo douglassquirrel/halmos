@@ -215,8 +215,11 @@ to `lib/edit.py` currently has to reconstruct from usage:
 
 (`0_check.py` is a third, smaller script alongside them — a preflight
 environment check with no `PROJECT_DIR`, no argument parsing, and no side
-effects: it calls `media.ffmpeg_diagnostic()` (does ffmpeg actually *run* -
-`which` finding a binary is not proof of that; see below),
+effects: it checks `sys.version_info` directly (2_make.py's word-level
+transcription needs a `google-genai` feature that doesn't exist in any
+version installable on Python 3.9 or older - no code-side fix, unlike the
+gaps below), then calls `media.ffmpeg_diagnostic()` (does ffmpeg actually
+*run* - `which` finding a binary is not proof of that; see below),
 `media.has_ffmpeg_filter()`, `gem.api_key()`, and the package-import check
 already used elsewhere, and reports every problem it finds rather than
 exiting on the first one. It exists so the failure modes below - a missing

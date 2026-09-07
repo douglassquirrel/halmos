@@ -46,6 +46,17 @@ python3 --version
 ffmpeg -version
 ```
 
+**Python needs to be 3.10 or newer.** `2_make.py`'s step that turns your
+recording into word-by-word timing needs a feature that genuinely does not
+exist in the add-on this uses (`google-genai`) below that version — not
+something a newer copy of the add-on can fix on an older Python. If
+`python3 --version` shows 3.9 or older:
+
+- On a Mac: `brew install python@3.12`, then use `python3.12` in place of
+  `python3` for every command below and in "Making a video" (including
+  installing the add-on itself).
+- Otherwise: download a current version from python.org.
+
 If either says "command not found":
 
 - **Python** — download from python.org and install it.
@@ -100,6 +111,12 @@ pip3 install --user --break-system-packages google-genai
 (Those two flags are Homebrew's own suggested way past that message, for
 installing one library like this rather than a whole project's worth. See
 `TROUBLESHOOTING.md` for another way, if you'd rather not use them.)
+
+**If you installed a newer Python above** (`brew install python@3.12` or
+similar), use that version's own `pip` explicitly, since plain `pip`/`pip3`
+may still point at your old one: `python3.12 -m pip install --user
+--break-system-packages google-genai`, then run both halmos commands with
+`python3.12` too.
 
 ## 2. A Google API key
 

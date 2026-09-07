@@ -26,8 +26,30 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 from lib import gem, media  # noqa: E402
 
 
-def main():
+def main():  # noqa: C901 - a linear list of independent checks, not a candidate for splitting
     problems = []
+
+    # Found live, 2026-09-07: 2_make.py's word-level audio transcription
+    # needs a google-genai feature (AudioTranscriptionConfig as a field of
+    # GenerateContentConfig) that doesn't exist in ANY version installable
+    # on Python 3.9 or older - google-genai 2.0.0+ requires Python >=3.10
+    # (confirmed against PyPI's release metadata), and no version before
+    # that has the feature at all. Unlike the ffmpeg/image_size gaps, there
+    # is no code-side fix for this - 1_plan.py may still work on old
+    # Python, but 2_make.py cannot.
+    if sys.version_info < (3, 10):
+        problems.append(
+            f"Your Python is {sys.version_info.major}.{sys.version_info.minor} - "
+            "2_make.py's audio transcription step needs a google-genai feature "
+            "that no version installable on this Python has (google-genai\n"
+            "         2.0.0+ needs Python 3.10 or newer). 1_plan.py may still work; "
+            "2_make.py will not.\n"
+            "         On a Mac: brew install python@3.12, then use python3.12 "
+            "instead of python3 for both halmos commands."
+        )
+        print(f"MISSING  a new enough Python for 2_make.py ({sys.version.split()[0]})")
+    else:
+        print(f"OK       Python is new enough for 2_make.py ({sys.version.split()[0]})")
 
     ffmpeg_ok, ffmpeg_detail = media.ffmpeg_diagnostic()
     if which("ffmpeg") and which("ffprobe") and ffmpeg_ok:

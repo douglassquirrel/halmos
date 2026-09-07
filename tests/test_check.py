@@ -28,6 +28,33 @@ def test_check_passes_when_everything_is_present(check_cli, monkeypatch, capsys)
 
 
 @requires_google_genai
+def test_check_reports_a_too_old_python_for_2_make(check_cli, monkeypatch, capsys):
+    # Found live, 2026-09-07: 2_make.py's audio transcription needs a
+    # google-genai feature that doesn't exist in any version installable on
+    # Python 3.9 or older (google-genai 2.0.0+ needs Python >=3.10,
+    # confirmed against PyPI's release metadata) - unlike the ffmpeg/
+    # image_size gaps, there's no code-side fix, so this must be caught
+    # here rather than promised away.
+    class FakeVersionInfo(tuple):
+        major, minor = 3, 9
+
+    monkeypatch.setattr(check_cli, "which", lambda name: "/usr/bin/" + name)
+    monkeypatch.setattr(check_cli.sys, "version_info", FakeVersionInfo((3, 9, 0, "final", 0)))
+    monkeypatch.setattr(media, "ffmpeg_diagnostic", lambda: (True, ""))
+    monkeypatch.setattr(media, "has_ffmpeg_filter", lambda name: True)
+    monkeypatch.setattr(gem, "need_package", lambda: None)
+    monkeypatch.setattr(gem, "api_key", lambda: "fake-key")
+
+    with pytest.raises(SystemExit):
+        check_cli.main()
+
+    out = capsys.readouterr().out
+    assert "MISSING  a new enough Python for 2_make.py" in out
+    assert "Python 3.10 or newer" in out
+    assert "1 problem(s) found" in out
+
+
+@requires_google_genai
 def test_check_reports_whatever_need_package_says_on_failure(check_cli, monkeypatch, capsys):
     # 0_check.py delegates entirely to gem.need_package() for this check
     # (see lib/gem.py's own comment on why there's no version gate here
