@@ -213,7 +213,15 @@ to `lib/edit.py` currently has to reconstruct from usage:
 
 ## `1_plan.py` / `2_make.py` — the two commands
 
-Both are linear scripts, not modules meant to be imported — `main(argv=None)`
+(`0_check.py` is a third, smaller script alongside them — a preflight
+environment check with no `PROJECT_DIR`, no argument parsing, and no side
+effects: it just calls `media.has_ffmpeg_filter()`, `gem.api_key()`, and the
+package-import check already used elsewhere, and reports every problem it
+finds rather than exiting on the first one. It exists so the failure modes
+below - a missing library, a missing key - are caught before a real run
+rather than partway through one.)
+
+`1_plan.py`/`2_make.py` are both linear scripts, not modules meant to be imported — `main(argv=None)`
 in each parses arguments (via `parse_args(argv)`, so tests can call `main()`
 directly without touching `sys.argv`), reads inputs, calls into `lib/`, and
 writes outputs, in the order shown in the diagram above. `main()` is the

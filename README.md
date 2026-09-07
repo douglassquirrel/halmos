@@ -56,6 +56,18 @@ If either says "command not found":
   everything.) On Windows, download from ffmpeg.org. On Linux,
   `sudo apt install ffmpeg`.
 
+**`ffmpeg -version` succeeding is not enough** — it only proves ffmpeg is
+installed, not that it has the two libraries halmos needs. Check for those
+directly:
+
+```
+ffmpeg -filters | grep -E "ass|drawtext"
+```
+
+You should see two lines back, one mentioning "libass" and one mentioning
+"libfreetype". If you see only one, or none, you have the plain formula —
+install `ffmpeg-full` as above (or your system's equivalent full build).
+
 Then install the one add-on this uses:
 
 ```
@@ -134,6 +146,18 @@ a reason to change them.
 
 Open **`settings.json`** if you want to change the video's name, the mood of the
 music, or the spending limit. It is fine to leave it exactly as it is.
+
+## 5. Check your setup
+
+```
+python3 0_check.py
+```
+
+This looks for everything above — both programs, the caption and labelling
+libraries inside ffmpeg, and your API key — and tells you everything that's
+missing in one go, rather than one surprise at a time partway through a real
+run. It costs nothing and makes no network call. If it says everything is
+in place, you are ready for the next section.
 
 ---
 
@@ -288,6 +312,7 @@ done.
 | `script.txt` | **Your words.** You edit this. |
 | `settings.json` | Name, music mood, spending limit. |
 | `corrections.txt` | Written for you by step 1; you edit it if a picture is wrong. |
+| `0_check.py` | Checks your setup is ready. Run it first, and whenever in doubt. |
 | `1_plan.py`, `2_make.py` | The two commands. |
 | `lib/` | The machinery. Nothing to change in here. |
 | `spend.log` | Every charge, as it happens, so you always know what a video cost. |

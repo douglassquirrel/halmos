@@ -3,6 +3,10 @@
 **Everything here is safe to re-run.** Neither command undoes finished work, and
 clips that already exist are never paid for twice.
 
+**Run `python3 0_check.py` first.** Several of the rows below (missing ffmpeg,
+missing libass, missing google-genai, missing key) are things it catches for
+free, before you spend any time on a real run.
+
 | What you see | What it means | What to do |
 |---|---|---|
 | `No API key found` | halmos looked in `~/.config/halmos/key` and in the `GEMINI_API_KEY` environment variable and found neither | Follow "A Google API key" in `README.md`. The message itself prints the two lines to paste |
@@ -11,7 +15,7 @@ clips that already exist are never paid for twice.
 | `RESOURCE_EXHAUSTED`, mentions **prepayment credits** | The Google account is out of money | Top it up at aistudio.google.com. Nothing was charged |
 | `429` errors coming quickly | Too many requests per minute (the limit is two) | Wait five minutes and re-run. Do not run two copies at once |
 | `ffmpeg is not installed` | Missing program | See README, "Before you start" |
-| `No option name near '...ass...'` during `2_make.py`'s final step | Your `ffmpeg` was built without the caption-rendering library | On a Mac, `brew install ffmpeg-full` (plain `brew install ffmpeg` doesn't include it) |
+| `No option name near '...ass...'` during `2_make.py`'s final step | Your `ffmpeg` was built without the caption-rendering library | On a Mac, `brew install ffmpeg-full` (plain `brew install ffmpeg` doesn't include it). `python3 0_check.py` catches this before you get this far — or check for yourself with `ffmpeg -filters \| grep -E "ass\|drawtext"` |
 | `The google-genai package is missing` | Missing add-on | `pip install google-genai` |
 | `error: externally-managed-environment` while installing google-genai | Your Python came from Homebrew, which blocks plain `pip install` system-wide | `pip3 install --user --break-system-packages google-genai` (see README). Or, if you'd rather not use those flags: `python3 -m venv ~/.halmos-venv && source ~/.halmos-venv/bin/activate && pip install google-genai` — then run halmos's own two commands with that same venv activated |
 | `style_block.txt still has the placeholder text` | The look has not been described yet | Edit `style_block.txt`. See `STYLE.md` |

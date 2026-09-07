@@ -6,6 +6,18 @@ from lib import edit, media
 pytestmark = [pytest.mark.tier2, requires_ffmpeg]
 
 
+# ------------------------------------------------------- has_ffmpeg_filter ---
+# Backs 0_check.py's environment check and tests/conftest.py's
+# requires_libass/requires_drawtext skip-guards - one implementation, not
+# duplicated between the app and the test suite.
+def test_has_ffmpeg_filter_finds_a_filter_present_in_every_ffmpeg_build():
+    assert media.has_ffmpeg_filter("scale") is True
+
+
+def test_has_ffmpeg_filter_is_false_for_a_made_up_name():
+    assert media.has_ffmpeg_filter("not_a_real_filter_xyz") is False
+
+
 def _basic_cfg(shots, sources, work, out, **extra):
     cfg = {
         "video": "testvid",

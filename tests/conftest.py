@@ -10,7 +10,7 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from lib import gem  # noqa: E402
+from lib import gem, media  # noqa: E402
 
 
 @pytest.fixture(autouse=True)
@@ -47,13 +47,6 @@ def _have(binary):
     return shutil.which(binary) is not None
 
 
-def _ffmpeg_has_filter(name):
-    if not _have("ffmpeg"):
-        return False
-    out = subprocess.run(["ffmpeg", "-filters"], capture_output=True, text=True).stdout
-    return any(line.split()[1] == name for line in out.splitlines() if len(line.split()) > 1)
-
-
 requires_ffmpeg = pytest.mark.skipif(
     not (_have("ffmpeg") and _have("ffprobe")), reason="ffmpeg/ffprobe not installed"
 )
@@ -62,12 +55,14 @@ requires_ffmpeg = pytest.mark.skipif(
 # contact_sheet()'s labelling needs "drawtext" (libfreetype) - neither is in
 # Homebrew's plain `ffmpeg` formula as of this writing, only `ffmpeg-full`.
 # See DIARY.md: the README's own "brew install ffmpeg" instruction currently
-# produces a build that can't run 2_make.py at all.
+# produces a build that can't run 2_make.py at all. media.has_ffmpeg_filter()
+# is the same check 0_check.py uses to tell a user this before they hit it.
 requires_libass = pytest.mark.skipif(
-    not _ffmpeg_has_filter("ass"), reason="ffmpeg built without libass (need ffmpeg-full)"
+    not media.has_ffmpeg_filter("ass"), reason="ffmpeg built without libass (need ffmpeg-full)"
 )
 requires_drawtext = pytest.mark.skipif(
-    not _ffmpeg_has_filter("drawtext"), reason="ffmpeg built without drawtext (need ffmpeg-full)"
+    not media.has_ffmpeg_filter("drawtext"),
+    reason="ffmpeg built without drawtext (need ffmpeg-full)",
 )
 
 

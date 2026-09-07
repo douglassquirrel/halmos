@@ -54,6 +54,24 @@ def need_ffmpeg():
         sys.exit("ffmpeg is not installed. See README.md, 'Before you start'.")
 
 
+def has_ffmpeg_filter(name):
+    """Whether the installed ffmpeg was built with the named filter.
+
+    `need_ffmpeg()` only checks that ffmpeg exists at all - it says nothing
+    about which filters it was built with, so a plain `ffmpeg -version`
+    (or `which ffmpeg`) succeeding is not proof `edit.build()`'s caption
+    burn-in (needs "ass"/libass) or `contact_sheet()`'s labelling (needs
+    "drawtext") will actually work. Homebrew's plain `ffmpeg` formula lacks
+    both; `ffmpeg-full` has both - see README.md's "Before you start".
+    """
+    from shutil import which
+
+    if not which("ffmpeg"):
+        return False
+    out = subprocess.run(["ffmpeg", "-filters"], capture_output=True, text=True).stdout
+    return any(line.split()[1] == name for line in out.splitlines() if len(line.split()) > 1)
+
+
 # --------------------------------------------------------------- stills ------
 def make_still(beat, prompt, style, outdir="frames", force=False):
     """Draw one picture. Skips work already done, so a re-run after a crash or a
