@@ -432,6 +432,21 @@ def next_longest_available_clip(dur, resolution):
     return None
 
 
+def estimated_clip_cost(model, resolution, buy_seconds):
+    """A pre-flight cost estimate for one clip from `model`, for the budget
+    check in 2_make.py before it's known which model will actually succeed
+    for a given shot. Veo models (CLIP) charge per second bought at a given
+    resolution - the same formula make_clip_veo() itself uses for the real
+    charge (`buy * prices[resolution]`). The omni model's real cost depends
+    on token usage only known after the call; this reuses the same fallback
+    make_clip_omni() itself falls back to when usage isn't reported, rather
+    than inventing a second number for the same guess."""
+    if model == "omni":
+        return 10 * OMNI_PRICE_PER_S
+    _, prices = CLIP[model]
+    return buy_seconds * prices[resolution]
+
+
 def make_clip_veo(beat, prompt, style, dur, model, resolution, first_frame, outdir):
     from google.genai import types
 

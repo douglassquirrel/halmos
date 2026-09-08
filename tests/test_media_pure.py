@@ -35,6 +35,32 @@ def test_next_longest_available_clip_rounds_up_to_an_allowed_length(dur, resolut
     assert media.next_longest_available_clip(dur, resolution) == expected
 
 
+# ----------------------------------------------------------- estimated_clip_cost
+# 2_make.py's pre-flight budget check previously always priced its estimate
+# off the "lite" model regardless of what settings()["clip_models"] actually
+# contains - so a config that skips "lite" (or a "lite" that falls through to
+# a pricier model for real) could spend past the ceiling the estimate was
+# checked against. estimated_clip_cost() lets the caller price the estimate
+# off whichever model is actually about to be tried.
+def test_estimated_clip_cost_matches_make_clip_veo_s_own_formula():
+    # buy_seconds * prices[resolution] is exactly make_clip_veo()'s real
+    # cost formula (`cost = buy * prices[resolution]`) - the estimate must
+    # track it, not invent a different number.
+    for model in ("lite", "fast", "standard"):
+        for res in ("720p", "1080p"):
+            _, prices = media.CLIP[model]
+            assert media.estimated_clip_cost(model, res, buy_seconds=8) == 8 * prices[res]
+
+
+def test_estimated_clip_cost_for_omni_ignores_buy_seconds_and_resolution():
+    # make_clip_omni()'s real cost is token-based, known only after the call;
+    # its own fallback when usage isn't reported is `10 * OMNI_PRICE_PER_S` -
+    # the estimate reuses that same fallback rather than inventing a new one.
+    expected = 10 * media.OMNI_PRICE_PER_S
+    assert media.estimated_clip_cost("omni", "1080p", buy_seconds=8) == expected
+    assert media.estimated_clip_cost("omni", "720p", buy_seconds=4) == expected
+
+
 # -------------------------------------------------------------- find_retakes -
 def test_find_retakes_no_repeat():
     words = _words("the quick brown fox jumps over the lazy dog today and tomorrow")

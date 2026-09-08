@@ -625,6 +625,98 @@ def test_make_stops_once_every_clip_model_is_quota_exhausted(
         make_cli.main(["--project", str(project_dir)])
 
 
+# ----------------------------------------------- clip-generation budget check
+# gem.check_budget() previously priced its one upfront estimate off the
+# "lite" model unconditionally, and was never called again as real clip
+# spend accrued during the loop - so a customised clip_models that skips
+# "lite", or a model that costs more in practice than the estimate assumed,
+# could let real spend cross settings.json's max_spend_usd ceiling despite
+# README's "both commands stop before crossing it rather than after."
+@requires_ffmpeg
+@requires_drawtext
+@requires_google_genai
+def test_make_prices_the_upfront_estimate_off_the_first_configured_model(
+    plan_cli, make_cli, tmp_path, monkeypatch
+):
+    from lib import gem, media
+
+    project_dir = _run_plan_then_prepare_make(plan_cli, tmp_path, monkeypatch)
+    already_spent = gem.spent_so_far()
+    # 1 shot needing a clip, resolution 1080p (default) buys 8s. "standard"
+    # costs 8*0.40=$3.20/clip; "lite" (the old hardcoded assumption) would
+    # have cost 8*0.08=$0.64/clip. A ceiling that comfortably clears the
+    # "lite" price but not "standard"'s proves which one was actually used.
+    (project_dir / "settings.json").write_text(
+        json.dumps({"clip_models": ["standard"], "max_spend_usd": already_spent + 1.0})
+    )
+
+    calls = []
+    monkeypatch.setattr(media, "make_clip_veo", lambda *a, **k: (calls.append(1), (None, 0.0))[1])
+    monkeypatch.setattr(media, "make_clip_omni", lambda *a, **k: (calls.append(1), (None, 0.0))[1])
+
+    with pytest.raises(SystemExit) as exc_info:
+        make_cli.main(["--project", str(project_dir)])
+
+    # Stopped before ever attempting a clip - not partway through generating
+    # one at a price the ceiling was never actually checked against. Checked
+    # first, and separately from the exit message, so an unfixed run's real
+    # failure mode (proceeding to actually attempt a "standard"-priced clip,
+    # then failing later for an unrelated reason) shows up as a clear,
+    # directly diagnostic assertion rather than a message-text mismatch.
+    assert calls == []
+    assert "STOPPING" in str(exc_info.value)
+
+
+@requires_ffmpeg
+@requires_drawtext
+@requires_google_genai
+def test_make_rechecks_the_budget_before_each_remaining_clip(
+    plan_cli, make_cli, tmp_path, monkeypatch
+):
+    import os
+    import pathlib
+
+    from lib import gem, media
+
+    project_dir = _run_plan_then_prepare_make(plan_cli, tmp_path, monkeypatch, n_beats=2)
+    already_spent = gem.spent_so_far()
+    lite_estimate = 8 * media.CLIP["lite"][1]["1080p"]  # $0.64/clip
+    # Comfortably covers the upfront estimate for both clips ($1.28ish) but
+    # nowhere near enough once the first clip's REAL cost (simulated below
+    # at $2.50, standing in for "lite" quietly costing more than its listed
+    # rate, or falling through to a pricier model in a way this simplified
+    # per-model estimate can't see coming") is on the books.
+    cap = already_spent + 2 * lite_estimate + 0.10
+    (project_dir / "settings.json").write_text(
+        json.dumps({"clip_models": ["lite"], "max_spend_usd": cap})
+    )
+
+    calls = []
+
+    def expensive_success(beat, prompt, style, dur, model, resolution, first_frame, outdir):
+        calls.append(beat)
+        dst = f"{outdir}/beat_{beat}.mp4"
+        os.makedirs(outdir, exist_ok=True)
+        pathlib.Path(dst).write_bytes(b"fake clip bytes")
+        gem.log_spend("clip/lite", beat, 2.50, dst)
+        return dst, 2.50
+
+    monkeypatch.setattr(media, "make_clip_veo", expensive_success)
+
+    with pytest.raises(SystemExit) as exc_info:
+        make_cli.main(["--project", str(project_dir)])
+
+    # The first shot's real cost blew past what the estimate assumed - the
+    # loop must catch that before starting the second, not only check once
+    # at the very start when nothing had been spent yet. Checked first, and
+    # separately from the exit message, so an unfixed run's real failure
+    # mode (generating both clips, then crashing later trying to edit them)
+    # shows up as a clear, directly diagnostic assertion.
+    assert calls == ["1"]
+    assert not (project_dir / "gen" / "beat_2.mp4").exists()
+    assert "STOPPING" in str(exc_info.value)
+
+
 @requires_ffmpeg
 @requires_drawtext
 @requires_google_genai

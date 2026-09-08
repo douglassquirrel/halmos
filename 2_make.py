@@ -177,8 +177,9 @@ def main(argv=None):  # noqa: C901 - a linear script's main(), not a candidate f
         return gen_dir / f"beat_{beat}.mp4"
 
     need = [sh for sh in shots if not clip_path(sh["beat"]).exists()]
-    est = len(need) * media.next_longest_available_clip(maxdur, res) * media.CLIP["lite"][1][res]
-    gem.check_budget(est, s)
+    buy_seconds = media.next_longest_available_clip(maxdur, res)
+    per_clip_estimate = media.estimated_clip_cost(s["clip_models"][0], res, buy_seconds)
+    gem.check_budget(len(need) * per_clip_estimate, s)
     gem.say(
         f"Generating {len(need)} clips. This takes about "
         f"{len(need) * 1.7:.0f} minutes - it is working even when quiet."
@@ -191,6 +192,12 @@ def main(argv=None):  # noqa: C901 - a linear script's main(), not a candidate f
         dst = clip_path(b)
         if dst.exists():
             continue
+        # Real spend can already differ from the estimate above by the time
+        # this shot is reached (a cheap model quietly costing more than its
+        # listed rate, or falling through to a pricier one) - re-check per
+        # shot against real spent_so_far() rather than trusting one estimate
+        # made before anything in this loop had actually been spent.
+        gem.check_budget(per_clip_estimate, s)
         first_frame = str(frames_dir / f"{b}.png")
         made_it = None
         for m in s["clip_models"]:
