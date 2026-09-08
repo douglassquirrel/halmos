@@ -121,6 +121,7 @@ def _fake_shots():
 
 
 def test_check_frames_lets_a_fatal_model_error_propagate(monkeypatch, tmp_path):
+    monkeypatch.setattr(edit, "probe", lambda *a, **k: "24/1")
     monkeypatch.setattr(edit, "run", lambda *a, **k: None)
     monkeypatch.setattr(
         edit.gem,
@@ -132,8 +133,38 @@ def test_check_frames_lets_a_fatal_model_error_propagate(monkeypatch, tmp_path):
 
 
 def test_check_frames_still_degrades_silently_on_other_errors(monkeypatch, tmp_path):
+    monkeypatch.setattr(edit, "probe", lambda *a, **k: "24/1")
     monkeypatch.setattr(edit, "run", lambda *a, **k: None)
     monkeypatch.setattr(edit.gem, "ask", lambda *a, **k: (_ for _ in ()).throw(ValueError("boom")))
     sheet, probs = edit.check_frames(str(tmp_path / "final.mp4"), _fake_shots(), work=str(tmp_path))
     assert probs == []
     assert sheet == f"{tmp_path}/_check.png"
+
+
+# Regression: check_frames() hardcoded 30fps for its frame-index math
+# (`eq(n\,{int(round(x * 30))})`) while choose_inpoint() correctly derives
+# the real fps of the clip it samples via _parse_fps(). Harmless only by
+# convention today (1_plan.py always hardcodes plan.json["fps"] = 30, and
+# edit.build() always encodes the finished video at that value) - found
+# during a 2026-09-08 review pass, not from a real run, since no real clip
+# is currently produced at any other fps. Fixed to parse the finished
+# video's own real fps instead of assuming a fixed constant.
+def test_check_frames_samples_using_the_videos_real_fps_not_a_hardcoded_30(monkeypatch, tmp_path):
+    recorded = {}
+
+    def fake_run(args, what=""):
+        recorded["args"] = args
+
+    # A real ffprobe stream=r_frame_rate reading, at a value deliberately
+    # different from the old hardcoded 30 - proves the real value is used.
+    monkeypatch.setattr(edit, "probe", lambda *a, **k: "20/1")
+    monkeypatch.setattr(edit, "run", fake_run)
+    monkeypatch.setattr(edit.gem, "ask", lambda *a, **k: {"problems": []})
+
+    # One shot, dur=4.0 -> sample time = 0 + 4.0 * 0.6 = 2.4s.
+    shots = [{"beat": "1", "dur": 4.0}]
+    edit.check_frames(str(tmp_path / "final.mp4"), shots, work=str(tmp_path))
+
+    vf = recorded["args"][recorded["args"].index("-vf") + 1]
+    assert "eq(n\\,48)" in vf  # round(2.4 * 20) - the real fps
+    assert "eq(n\\,72)" not in vf  # round(2.4 * 30) - the old hardcoded one

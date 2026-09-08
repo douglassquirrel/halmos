@@ -149,7 +149,12 @@ def check_frames(video, shots, work="work"):
     for s in shots:
         times.append(t + s["dur"] * 0.6)
         t += s["dur"]
-    sel = "+".join(f"eq(n\\,{int(round(x * 30))})" for x in times)
+    # The finished video's real fps, not a hardcoded assumption - matches
+    # choose_inpoint()'s own _parse_fps() use for the same reason (TODO.md
+    # bug #2: an unguarded frame-rate assumption silently samples the wrong
+    # instant of a shot).
+    fps = _parse_fps(probe(video, "stream=r_frame_rate"))
+    sel = "+".join(f"eq(n\\,{int(round(x * fps))})" for x in times)
     cols = 6
     rows = (len(times) + cols - 1) // cols
     sheet = f"{work}/_check.png"
